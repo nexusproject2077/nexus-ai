@@ -5,11 +5,12 @@
 //  mode). Otherwise everything lives in memory (handy for local
 //  dev; data is lost on restart).
 //
-//  On Cloud Run in the same GCP project, Firestore works with
-//  Application Default Credentials — no key file needed. Locally,
-//  point GOOGLE_APPLICATION_CREDENTIALS at a service-account key.
+//  Cloud Run can use Application Default Credentials. Vercel can
+//  use FIREBASE_SERVICE_ACCOUNT_JSON (or the split FIREBASE_* vars).
+//  See firebase-admin.js for credential resolution.
 // ===============================================================
 import { randomUUID } from 'node:crypto';
+import { getFirebaseAdmin } from './firebase-admin.js';
 
 const USE_FIRESTORE = process.env.USE_FIRESTORE === 'true';
 
@@ -112,12 +113,7 @@ let _store = null;
 export async function getStore() {
   if (_store) return _store;
   if (USE_FIRESTORE) {
-    const admin = (await import('firebase-admin')).default;
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || undefined,
-      });
-    }
+    const admin = getFirebaseAdmin();
     _store = createFirestoreStore(admin.firestore());
     console.log('Storage: Firestore');
   } else {
