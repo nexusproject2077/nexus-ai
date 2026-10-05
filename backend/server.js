@@ -1,5 +1,5 @@
 // ===============================================================
-//  NEXUS AI — Backend API (Cloud Run ready)
+//  NEXUS AI — Backend API (Cloud Run + Vercel ready)
 // ---------------------------------------------------------------
 //  Reproduces every route the frontend calls:
 //    POST   /auth/register        POST   /auth/login
@@ -20,6 +20,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { getStore, randomUUID } from './store.js';
+import { getFirebaseAdmin } from './firebase-admin.js';
 
 const app = express();
 app.use(cors());                       // allow the Firebase-hosted frontend
@@ -166,21 +167,14 @@ async function migrateFromLegacy(email, password) {
 
 // ---------------------------------------------------------------
 //  FIREBASE ADMIN (lazy) — verifies social sign-in ID tokens.
-//  On Cloud Run in the same GCP project, Application Default
-//  Credentials work with no extra config. Locally, set
-//  GOOGLE_APPLICATION_CREDENTIALS to a service-account key file.
+//  The shared bootstrap supports Cloud Run ADC and Vercel env secrets.
 // ---------------------------------------------------------------
 let admin = null;
 let firebaseReady = false;
 async function ensureFirebase() {
   if (firebaseReady) return true;
   try {
-    if (!admin) admin = (await import('firebase-admin')).default;
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || undefined,
-      });
-    }
+    admin = getFirebaseAdmin();
     firebaseReady = true;
   } catch (e) {
     console.error('Firebase Admin unavailable:', e.message);
@@ -491,4 +485,10 @@ app.use((err, req, res, next) => {
 });
 
 // ---------------------------------------------------------------
-app.listen(PORT, () => console.log(`Nexus AI backend listening on :${PORT}`));
+// Vercel detects the default-exported Express app. Local/Cloud Run
+// execution still starts the HTTP listener normally.
+export default app;
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => console.log(`Nexus AI backend listening on :${PORT}`));
+}
