@@ -1205,20 +1205,47 @@ window.deleteMemoryItem = async function(index) {
     } catch (err) { console.error(err); }
 };
 
+function escapeMemoryHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
+}
+
 function renderMemoryList() {
     const container = document.getElementById('memory-list');
     if (!container) return;
     if (_userMemory.length === 0) {
-        container.innerHTML = '<p style="color:rgba(255,255,255,0.25);font-size:0.8rem;text-align:center;padding:12px 0">Aucun souvenir enregistre</p>';
+        container.innerHTML = '<div class="memory-empty"><strong>Aucun souvenir</strong><span>Nexus ajoutera ici les informations utiles retenues dans tes conversations.</span></div>';
         return;
     }
-    container.innerHTML = _userMemory.map((fact, i) => `
-        <div class="memory-item">
-            <span class="memory-text">${fact}</span>
-            <button class="memory-delete" onclick="deleteMemoryItem(${i})" title="Supprimer">x</button>
-        </div>
-    `).join('');
+    const editIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
+    const deleteIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>';
+    container.innerHTML = _userMemory.map((fact, i) => '<div class="memory-item" data-memory-index="' + i + '"><div class="memory-item-content"><span class="memory-text">' + escapeMemoryHTML(fact) + '</span></div><div class="memory-item-actions"><button class="memory-edit" onclick="editMemoryItem(' + i + ')" title="Modifier" aria-label="Modifier">' + editIcon + '</button><button class="memory-delete" onclick="deleteMemoryItem(' + i + ')" title="Supprimer" aria-label="Supprimer">' + deleteIcon + '</button></div></div>').join('');
 }
+
+window.editMemoryItem = function(index) {
+    const item = document.querySelector('[data-memory-index="' + index + '"]');
+    if (!item || index < 0 || index >= _userMemory.length) return;
+    item.querySelector('.memory-item-content').innerHTML = '<textarea class="memory-edit-input" rows="2">' + escapeMemoryHTML(_userMemory[index]) + '</textarea>';
+    item.querySelector('.memory-item-actions').innerHTML = '<button class="memory-cancel" onclick="renderMemoryList()">Annuler</button><button class="memory-save" onclick="saveEditedMemoryItem(' + index + ')">OK</button>';
+    const input = item.querySelector('.memory-edit-input');
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+};
+
+window.saveEditedMemoryItem = async function(index) {
+    const item = document.querySelector('[data-memory-index="' + index + '"]');
+    const value = (item?.querySelector('.memory-edit-input')?.value || '').trim();
+    if (!value) { showToast('Le souvenir ne peut pas etre vide.', 'error'); return; }
+    const previous = [..._userMemory];
+    _userMemory[index] = value;
+    try {
+        await saveMemoryToServer(_userMemory);
+        renderMemoryList();
+        showToast('Souvenir modifie.', 'success');
+    } catch (err) {
+        _userMemory = previous;
+        renderMemoryList();
+        showToast('Impossible de modifier le souvenir.', 'error');
+    }
+};
 
 window.openMemory = function() {
     const overlay = document.getElementById('memory-overlay');
