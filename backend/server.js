@@ -33,15 +33,13 @@ const GROQ_URL    = 'https://api.groq.com/openai/v1/chat/completions';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 // Google AI Studio exposes an OpenAI-compatible endpoint — same request shape.
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // Allow-listed models → which provider serves them (safety + routing).
 const MODEL_PROVIDER = {
-  'llama-3.3-70b-versatile': 'groq',
-  'llama-3.1-8b-instant':    'groq',
-  'llama3-70b-8192':         'groq',
-  'mixtral-8x7b-32768':      'groq',
-  'gemma2-9b-it':            'groq',
+  'openai/gpt-oss-120b':    'groq',
+  'openai/gpt-oss-20b':      'groq',
+  'qwen/qwen3.8-27b':        'groq',
   'gemini-3.8-flash':        'gemini',
   'gemini-3.5-flash-lite':   'gemini',
 };
