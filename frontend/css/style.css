@@ -4284,3 +4284,33 @@ button,
         padding-right: 56px !important;
     }
 }
+
+
+/* Nexus top pill — requested 690 × 111 px reference size */
+.nexus-header,
+#sidebar.hidden ~ #main-content .nexus-header {
+    width: 690px !important;
+    max-width: calc(100vw - 48px) !important;
+    height: 111px !important;
+    min-height: 111px !important;
+    box-sizing: border-box !important;
+    border-radius: 55.5px !important;
+}
+.nexus-header-inner {
+    height: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 24px !important;
+}
+@media (max-width: 768px) {
+    .nexus-header,
+    #sidebar.hidden ~ #main-content .nexus-header {
+        width: min(690px, calc(100vw - 112px)) !important;
+        max-width: calc(100vw - 112px) !important;
+        height: 111px !important;
+        min-height: 111px !important;
+        border-radius: 55.5px !important;
+    }
+}
