@@ -4103,3 +4103,36 @@ button,
         padding-top: calc(142px + env(safe-area-inset-top, 0px)) !important;
     }
 }
+
+
+/* Mobile sidebar toggle: keep it outside the Nexus header and at a proper
+   iOS-sized tap target instead of overlapping the glass title capsule. */
+@media (max-width: 768px) {
+    #toggle-sidebar-outside {
+        position: fixed !important;
+        top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+        left: 14px !important;
+        right: auto !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+        z-index: 300 !important;
+        transform: none !important;
+    }
+
+    #toggle-sidebar-outside:hover {
+        transform: none !important;
+    }
+
+    #toggle-sidebar-outside:active {
+        transform: scale(.94) !important;
+    }
+
+    /* Leave room for the toggle so it never covers the centered logo. */
+    .nexus-header,
+    #sidebar.hidden ~ #main-content .nexus-header {
+        width: calc(100vw - 88px) !important;
+        left: calc(50% + 24px) !important;
+    }
+}
