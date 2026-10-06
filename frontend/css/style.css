@@ -4218,3 +4218,39 @@ button,
         line-height: 22px !important;
     }
 }
+
+
+/* Conversation actions — iOS glass popover, SVG only */
+.conversation-item { position:relative !important; }
+.conversation-title-row { display:flex; align-items:center; gap:6px; min-width:0; padding-right:28px; }
+.conversation-pin-indicator { display:grid; place-items:center; color:rgba(255,255,255,.5); flex:0 0 auto; }
+.conversation-pin-indicator svg { width:12px; height:12px; }
+.conversation-more-btn {
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    width:30px; height:30px; padding:0; display:grid; place-items:center;
+    border:0; border-radius:50%; background:transparent; color:rgba(255,255,255,.58);
+}
+.conversation-more-btn:hover,.conversation-more-btn:focus-visible { background:rgba(118,118,128,.18); color:#fff; }
+.conversation-more-btn svg { width:17px; height:17px; }
+.conversation-actions-menu {
+    position:absolute; right:6px; top:calc(100% - 5px); z-index:500;
+    width:178px; padding:6px; border-radius:16px;
+    background:rgba(38,38,42,.92); border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 18px 42px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter:blur(30px) saturate(160%); -webkit-backdrop-filter:blur(30px) saturate(160%);
+}
+.conversation-actions-menu.hidden { display:none !important; }
+.conversation-actions-menu button {
+    width:100%; min-height:40px; padding:0 10px; display:flex; align-items:center; gap:10px;
+    border:0; border-radius:11px; background:transparent; color:rgba(255,255,255,.92);
+    font-size:14px; text-align:left;
+}
+.conversation-actions-menu button:hover { background:rgba(118,118,128,.2); }
+.conversation-actions-menu button.danger { color:#ff6961; }
+.conversation-actions-menu svg { width:16px; height:16px; flex:0 0 auto; }
+.conversation-item.pinned { background:rgba(255,255,255,.055); }
+@media (max-width:768px) {
+    .conversation-more-btn { width:36px; height:36px; right:6px; }
+    .conversation-actions-menu { width:190px; }
+    .conversation-actions-menu button { min-height:44px; font-size:15px; }
+}
