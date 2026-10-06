@@ -3466,3 +3466,452 @@ body::after,
         transition-duration: .01ms !important;
     }
 }
+
+
+/* =====================================================================
+   iOS 27 UI KIT — BUTTONS & CONTROLS
+   Based on the uploaded Apple iOS 27 UI Kit:
+   - Small 28pt / Regular 34pt / Large 46pt
+   - SF Pro Medium
+   - fully rounded glass capsules
+   - dark glass = ~17% neutral material
+   - prominent tint = #0091ff
+   ===================================================================== */
+:root {
+    --ios27-blue: #0091ff;
+    --ios27-blue-hover: #159cff;
+    --ios27-blue-pressed: #007fdc;
+    --ios27-red: #ff4245;
+    --ios27-glass: rgba(153, 153, 153, 0.17);
+    --ios27-glass-hover: rgba(170, 170, 170, 0.23);
+    --ios27-glass-pressed: rgba(190, 190, 190, 0.14);
+    --ios27-glass-border: rgba(255, 255, 255, 0.14);
+    --ios27-glass-highlight: rgba(255, 255, 255, 0.20);
+    --ios27-label: rgba(255, 255, 255, 0.96);
+    --ios27-secondary-label: rgba(235, 235, 245, 0.60);
+    --ios27-disabled: rgba(235, 235, 245, 0.30);
+    --ios27-control-shadow: 0 8px 15px rgba(0, 0, 0, 0.04);
+}
+
+/* Shared Apple-like control geometry */
+.auth-btn,
+.social-btn,
+#new-chat-btn,
+#memory-btn,
+.model-selector-btn,
+.powered-tag,
+.speed-meter,
+.phone-save-btn,
+.phone-skip-btn,
+.settings-action-btn,
+.settings-danger-btn,
+#attach-file-btn,
+#home-btn,
+#send-button,
+#stop-button,
+#settings-btn,
+#logout-btn,
+#toggle-sidebar-inside,
+#toggle-sidebar-outside,
+.suggestion-card,
+.delete-conv-btn,
+.memory-delete,
+.copy-code-btn {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif !important;
+    font-weight: 500 !important;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background-color .16s ease,
+        border-color .16s ease,
+        transform .12s ease,
+        opacity .16s ease,
+        box-shadow .16s ease !important;
+}
+
+/* Regular button — kit: 34pt high, 12pt horizontal padding, 17pt type */
+.social-btn,
+.model-selector-btn,
+.powered-tag,
+.speed-meter,
+.phone-skip-btn,
+.settings-action-btn,
+.settings-danger-btn {
+    min-height: 34px !important;
+    padding: 8px 12px !important;
+    border-radius: 999px !important;
+    font-size: 17px !important;
+    line-height: 18px !important;
+}
+
+/* Large button — kit: 46pt high, 20pt horizontal padding, 17pt type */
+.auth-btn,
+#new-chat-btn,
+.phone-save-btn {
+    min-height: 46px !important;
+    padding: 14px 20px !important;
+    border-radius: 999px !important;
+    font-size: 17px !important;
+    line-height: 18px !important;
+}
+
+/* Small button — kit: 28pt high, 10pt horizontal padding, 15pt type */
+#memory-btn,
+.delete-conv-btn,
+.memory-delete,
+.copy-code-btn {
+    min-height: 28px !important;
+    padding: 5px 10px !important;
+    border-radius: 999px !important;
+    font-size: 15px !important;
+    line-height: 18px !important;
+}
+
+/* Dark glass button material */
+.social-btn,
+.model-selector-btn,
+.powered-tag,
+.speed-meter,
+.phone-skip-btn,
+#memory-btn,
+.settings-action-btn {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.015)),
+        var(--ios27-glass) !important;
+    color: var(--ios27-label) !important;
+    border: 1px solid var(--ios27-glass-border) !important;
+    box-shadow:
+        inset 0 1px 0 var(--ios27-glass-highlight),
+        inset 0 -1px 0 rgba(0,0,0,.22),
+        var(--ios27-control-shadow) !important;
+    backdrop-filter: blur(26px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(26px) saturate(150%) !important;
+}
+
+.social-btn:hover,
+.model-selector-btn:hover,
+.powered-tag:hover,
+.speed-meter:hover,
+.phone-skip-btn:hover,
+#memory-btn:hover,
+.settings-action-btn:hover {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.025)),
+        var(--ios27-glass-hover) !important;
+    border-color: rgba(255,255,255,.18) !important;
+    transform: none !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.24),
+        inset 0 -1px 0 rgba(0,0,0,.20),
+        var(--ios27-control-shadow) !important;
+}
+
+.social-btn:active,
+.model-selector-btn:active,
+.phone-skip-btn:active,
+#memory-btn:active,
+.settings-action-btn:active {
+    background: var(--ios27-glass-pressed) !important;
+    transform: scale(.975) !important;
+}
+
+/* Prominent glass / tinted buttons */
+.auth-btn,
+#new-chat-btn,
+.phone-save-btn,
+#send-button {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,0)),
+        var(--ios27-blue) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,.20) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.28),
+        inset 0 -1px 0 rgba(0,0,0,.14),
+        var(--ios27-control-shadow) !important;
+    backdrop-filter: blur(24px) saturate(155%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(155%) !important;
+}
+
+.auth-btn:hover,
+#new-chat-btn:hover,
+.phone-save-btn:hover,
+#send-button:hover {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0)),
+        var(--ios27-blue-hover) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.30),
+        inset 0 -1px 0 rgba(0,0,0,.14),
+        var(--ios27-control-shadow) !important;
+    transform: none !important;
+}
+
+.auth-btn:active,
+#new-chat-btn:active,
+.phone-save-btn:active,
+#send-button:active {
+    background: var(--ios27-blue-pressed) !important;
+    transform: scale(.98) !important;
+}
+
+/* Disabled state from kit */
+button:disabled,
+.auth-btn:disabled,
+.phone-save-btn:disabled {
+    opacity: .30 !important;
+    cursor: default !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Circular symbol buttons — Apple icon controls */
+#attach-file-btn,
+#home-btn,
+#settings-btn,
+#toggle-sidebar-inside,
+#toggle-sidebar-outside,
+#logout-btn,
+#send-button,
+#stop-button {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#attach-file-btn,
+#home-btn,
+#settings-btn,
+#toggle-sidebar-inside,
+#toggle-sidebar-outside {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.015)),
+        var(--ios27-glass) !important;
+    color: var(--ios27-label) !important;
+    border: 1px solid var(--ios27-glass-border) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.20),
+        inset 0 -1px 0 rgba(0,0,0,.18) !important;
+}
+
+#attach-file-btn:hover,
+#home-btn:hover,
+#settings-btn:hover,
+#toggle-sidebar-inside:hover,
+#toggle-sidebar-outside:hover {
+    background: var(--ios27-glass-hover) !important;
+}
+
+#attach-file-btn:active,
+#home-btn:active,
+#settings-btn:active,
+#toggle-sidebar-inside:active,
+#toggle-sidebar-outside:active {
+    transform: scale(.94) !important;
+}
+
+#logout-btn,
+.settings-danger-btn,
+.delete-conv-btn,
+.memory-delete,
+#stop-button {
+    background: rgba(255,66,69,.14) !important;
+    color: #ff696d !important;
+    border: 1px solid rgba(255,66,69,.16) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+
+#logout-btn:hover,
+.settings-danger-btn:hover,
+.delete-conv-btn:hover,
+.memory-delete:hover,
+#stop-button:hover {
+    background: rgba(255,66,69,.22) !important;
+}
+
+/* Suggestion cards: no longer "buttons from a website"; use iOS glass cells */
+.suggestion-card {
+    min-height: 68px !important;
+    padding: 12px 14px !important;
+    border-radius: 22px !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(153,153,153,.10) !important;
+    border: 1px solid rgba(255,255,255,.10) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.10),
+        0 8px 24px rgba(0,0,0,.04) !important;
+    backdrop-filter: blur(24px) saturate(145%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(145%) !important;
+}
+
+.suggestion-card:hover {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.024)),
+        rgba(153,153,153,.15) !important;
+    border-color: rgba(255,255,255,.14) !important;
+}
+
+.suggestion-card:active {
+    transform: scale(.985) !important;
+}
+
+.suggestion-icon {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 12px !important;
+    background: rgba(0,145,255,.15) !important;
+    color: #5eb7ff !important;
+    border: 0 !important;
+}
+
+/* Model menu as an iOS popover list */
+.model-menu {
+    padding: 6px !important;
+    border-radius: 20px !important;
+    background: rgba(35,35,39,.86) !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    box-shadow:
+        0 20px 48px rgba(0,0,0,.28),
+        inset 0 1px 0 rgba(255,255,255,.08) !important;
+    backdrop-filter: blur(36px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(36px) saturate(160%) !important;
+}
+
+.model-option {
+    min-height: 44px !important;
+    padding: 8px 12px !important;
+    border-radius: 14px !important;
+    border: 0 !important;
+}
+
+.model-option:hover {
+    background: rgba(153,153,153,.15) !important;
+}
+
+.model-option.active {
+    background: rgba(0,145,255,.17) !important;
+}
+
+.model-option-main {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+}
+
+.model-option-hint {
+    font-size: 12px !important;
+    color: var(--ios27-secondary-label) !important;
+}
+
+/* Input bar action buttons should visually match iOS 27 */
+#input-container {
+    gap: 8px !important;
+}
+
+#send-button svg,
+#attach-file-btn svg,
+#home-btn svg,
+#settings-btn svg,
+#toggle-sidebar-inside svg,
+#toggle-sidebar-outside svg,
+#logout-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+/* Authentication social controls: keep layout wide but adopt kit glass */
+.social-btn {
+    flex: 1 1 0 !important;
+    border-radius: 17px !important;
+    font-size: 15px !important;
+}
+
+/* Segmented control, closer to the kit */
+.auth-tabs {
+    min-height: 36px !important;
+    padding: 2px !important;
+    border-radius: 12px !important;
+    background: rgba(118,118,128,.18) !important;
+    border: 0 !important;
+}
+
+.auth-tab {
+    min-height: 32px !important;
+    border-radius: 10px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
+.auth-tab.active {
+    background: rgba(255,255,255,.92) !important;
+    color: #111 !important;
+    box-shadow:
+        0 1px 3px rgba(0,0,0,.16),
+        inset 0 1px 0 rgba(255,255,255,.70) !important;
+}
+
+/* Text fields from the iOS kit: rounded, neutral and focus tint only */
+.auth-field input,
+.settings-input,
+.settings-select,
+.sidebar-search input,
+.phone-modal .auth-field input,
+#user-input {
+    border-radius: 14px !important;
+}
+
+.auth-field input,
+.phone-modal .auth-field input {
+    min-height: 44px !important;
+    padding: 11px 14px !important;
+    background: rgba(118,118,128,.12) !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+}
+
+.auth-field input:focus,
+.phone-modal .auth-field input:focus,
+.settings-input:focus,
+.sidebar-search input:focus {
+    border-color: rgba(0,145,255,.48) !important;
+    box-shadow: 0 0 0 4px rgba(0,145,255,.12) !important;
+}
+
+/* Fine-tune labels to SF Pro proportions */
+button,
+.auth-tab,
+.model-option,
+.suggestion-card {
+    letter-spacing: -0.012em !important;
+}
+
+/* Mobile: preserve Apple's recommended tap target without making controls huge */
+@media (max-width: 768px) {
+    #attach-file-btn,
+    #home-btn,
+    #settings-btn,
+    #toggle-sidebar-inside,
+    #toggle-sidebar-outside,
+    #logout-btn,
+    #send-button,
+    #stop-button {
+        width: 40px !important;
+        min-width: 40px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+    }
+
+    .model-selector-btn,
+    .powered-tag {
+        min-height: 36px !important;
+        font-size: 15px !important;
+    }
+
+    .suggestion-card {
+        min-height: 64px !important;
+    }
+}
