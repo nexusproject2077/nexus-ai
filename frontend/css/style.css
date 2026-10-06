@@ -4047,3 +4047,59 @@ button,
         padding-bottom: 112px !important;
     }
 }
+
+
+/* Keep the Nexus header + model/provider toolbar fixed while scrolling. */
+.nexus-header {
+    position: fixed !important;
+    top: 18px;
+    left: calc(280px + ((100vw - 280px) / 2));
+    transform: translateX(-50%);
+    width: min(900px, calc(100vw - 280px - 48px)) !important;
+    margin: 0 !important;
+    z-index: 240 !important;
+}
+
+.chat-toolbar {
+    position: fixed !important;
+    top: 112px;
+    left: calc(280px + ((100vw - 280px) / 2));
+    transform: translateX(-50%);
+    width: min(900px, calc(100vw - 280px - 48px)) !important;
+    margin: 0 !important;
+    z-index: 235 !important;
+}
+
+/* Re-center fixed header/toolbar when sidebar is collapsed. */
+#sidebar.hidden ~ #main-content .nexus-header,
+#sidebar.hidden ~ #main-content .chat-toolbar {
+    left: 50%;
+    width: min(900px, calc(100vw - 48px)) !important;
+}
+
+/* Reserve top space so messages/content start below the fixed controls. */
+#main-content {
+    padding-top: 170px !important;
+}
+
+@media (max-width: 768px) {
+    .nexus-header,
+    .chat-toolbar,
+    #sidebar.hidden ~ #main-content .nexus-header,
+    #sidebar.hidden ~ #main-content .chat-toolbar {
+        left: 50%;
+        width: calc(100vw - 24px) !important;
+    }
+
+    .nexus-header {
+        top: calc(10px + env(safe-area-inset-top, 0px));
+    }
+
+    .chat-toolbar {
+        top: calc(86px + env(safe-area-inset-top, 0px));
+    }
+
+    #main-content {
+        padding-top: calc(142px + env(safe-area-inset-top, 0px)) !important;
+    }
+}
