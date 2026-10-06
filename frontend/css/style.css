@@ -4010,3 +4010,40 @@ button,
 #sidebar:not(.hidden) ~ #toggle-sidebar-outside {
     display: none !important;
 }
+
+
+/* Keep the message composer fixed to the viewport instead of scrolling
+   with the conversation/page. */
+#input-container {
+    position: fixed !important;
+    left: calc(280px + ((100vw - 280px) / 2));
+    bottom: 18px;
+    transform: translateX(-50%);
+    width: min(900px, calc(100vw - 280px - 48px)) !important;
+    margin: 0 !important;
+    z-index: 250 !important;
+}
+
+/* When the sidebar is collapsed, center the fixed composer in the full viewport. */
+#sidebar.hidden ~ #main-content #input-container {
+    left: 50%;
+    width: min(900px, calc(100vw - 48px)) !important;
+}
+
+/* Reserve space so the last messages never sit underneath the fixed composer. */
+#chat-box {
+    padding-bottom: 110px !important;
+}
+
+@media (max-width: 768px) {
+    #input-container,
+    #sidebar.hidden ~ #main-content #input-container {
+        left: 50%;
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        width: calc(100vw - 24px) !important;
+    }
+
+    #chat-box {
+        padding-bottom: 112px !important;
+    }
+}
