@@ -118,6 +118,7 @@ window.handleLogout = function() {
     _settingsCache = null;
     conversations = [];
     currentConversationId = null;
+    stopConversationSync();
     document.getElementById('chat-page').classList.add('hidden');
     document.getElementById('auth-page').classList.remove('hidden');
 };
@@ -139,6 +140,7 @@ function initChatPage() {
     }
 
     loadConversationsFromServer();
+    startConversationSync();
     loadSettingsFromServer();
     initModelSelector();
     maybePromptPhone();
@@ -160,6 +162,8 @@ let conversations = [];
 let currentConversationId = null;
 let attachedFiles = [];
 let isTyping = false;
+let syncTimer = null;
+let lastSyncFingerprint = '';
 
 // ===== DEBOUNCE =====
 function debounce(fn, ms) {
@@ -510,12 +514,67 @@ window.removeFile = function(index) {
     renderUploadedFiles();
 };
 
+// ===== SYNCHRONISATION MULTI-APPAREILS =====
+// Uses the existing API/Firestore storage, so no extra paid service is required.
+function conversationFingerprint(list) {
+    return JSON.stringify((list || []).map(c => [c._id, c.title, c.updatedAt || c.createdAt, (c.messages || []).length]));
+}
+
+async function syncConversationsFromServer() {
+    if (!getToken() || document.hidden || isTyping) return;
+    try {
+        const res = await fetch(`${API_BASE}/conversations`, { headers: authHeaders(), cache: 'no-store' });
+        if (!res.ok) return;
+        const remote = await res.json();
+        const fingerprint = conversationFingerprint(remote);
+        if (fingerprint === lastSyncFingerprint) return;
+
+        const activeId = currentConversationId;
+        const activeBefore = conversations.find(c => c._id === activeId);
+        const activeRemote = remote.find(c => c._id === activeId);
+        conversations = remote;
+        lastSyncFingerprint = fingerprint;
+
+        renderConversationsList();
+
+        // Refresh the open conversation only when its server version actually changed.
+        if (activeRemote) {
+            const before = JSON.stringify(activeBefore?.messages || []);
+            const after = JSON.stringify(activeRemote.messages || []);
+            if (before !== after) loadConversation(activeId);
+        } else if (remote.length && activeId) {
+            loadConversation(remote[0]._id);
+        }
+    } catch (err) {
+        console.debug('Sync conversations:', err);
+    }
+}
+
+function startConversationSync() {
+    stopConversationSync();
+    syncTimer = setInterval(syncConversationsFromServer, 3000);
+}
+
+function stopConversationSync() {
+    if (syncTimer) clearInterval(syncTimer);
+    syncTimer = null;
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && getToken()) syncConversationsFromServer();
+});
+
+window.addEventListener('focus', () => {
+    if (getToken()) syncConversationsFromServer();
+});
+
 // ===== API CONVERSATIONS =====
 async function loadConversationsFromServer() {
     try {
         const res = await fetch(`${API_BASE}/conversations`, { headers: authHeaders() });
         if (res.status === 401) { handleLogout(); return; }
         conversations = await res.json();
+        lastSyncFingerprint = conversationFingerprint(conversations);
         if (conversations.length === 0) await createNewConversation();
         else loadConversation(conversations[0]._id);
         renderConversationsList();
@@ -544,6 +603,7 @@ async function saveConversationToServer(conv) {
             headers: authHeaders(),
             body: JSON.stringify({ title: conv.title, messages: conv.messages, history: conv.history })
         });
+        lastSyncFingerprint = '';
     } catch (err) {
         console.error('Erreur sauvegarde:', err);
     }
