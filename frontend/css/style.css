@@ -4163,3 +4163,19 @@ button,
         white-space: nowrap !important;
     }
 }
+
+
+/* Mobile header geometry: keep the Nexus capsule visually centered in the
+   viewport. The sidebar button floats independently instead of shifting it. */
+@media (max-width: 768px) {
+    .nexus-header,
+    #sidebar.hidden ~ #main-content .nexus-header {
+        left: 50% !important;
+        width: calc(100vw - 112px) !important;
+        transform: translateX(-50%) !important;
+    }
+
+    #toggle-sidebar-outside {
+        left: 10px !important;
+    }
+}
