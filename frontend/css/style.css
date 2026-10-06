@@ -4314,3 +4314,31 @@ button,
         border-radius: 55.5px !important;
     }
 }
+
+
+/* Nexus header — Dynamic Island proportions */
+.nexus-header,
+#sidebar.hidden ~ #main-content .nexus-header {
+    width: 345px !important;
+    max-width: calc(100vw - 112px) !important;
+    height: 55.5px !important;
+    min-height: 55.5px !important;
+    border-radius: 999px !important;
+}
+.nexus-header-inner {
+    height: 100% !important;
+    padding: 0 20px !important;
+}
+.nexus-header-inner h1 {
+    font-size: 1.15rem !important;
+    line-height: 1 !important;
+}
+@media (max-width: 768px) {
+    .nexus-header,
+    #sidebar.hidden ~ #main-content .nexus-header {
+        width: min(345px, calc(100vw - 112px)) !important;
+        height: 55.5px !important;
+        min-height: 55.5px !important;
+        border-radius: 999px !important;
+    }
+}
