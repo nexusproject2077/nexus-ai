@@ -42,8 +42,8 @@ const MODEL_PROVIDER = {
   'llama3-70b-8192':         'groq',
   'mixtral-8x7b-32768':      'groq',
   'gemma2-9b-it':            'groq',
-  'gemini-2.5-flash':        'gemini',
-  'gemini-2.5-flash-lite':   'gemini',
+  'gemini-3.8-flash':        'gemini',
+  'gemini-3.5-flash-lite':   'gemini',
 };
 
 const PROVIDERS = {
