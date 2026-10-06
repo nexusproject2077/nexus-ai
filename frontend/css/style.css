@@ -4191,3 +4191,30 @@ button,
         transform: translateX(-50%) !important;
     }
 }
+
+
+/* iMessage-like outgoing bubbles: short messages stay compact instead of
+   stretching across the chat width. */
+.user-message {
+    display: block !important;
+    width: fit-content !important;
+    max-width: min(72%, 620px) !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    padding: 9px 14px !important;
+    border-radius: 19px 19px 5px 19px !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+}
+
+@media (max-width: 768px) {
+    .user-message {
+        width: fit-content !important;
+        max-width: 78% !important;
+        min-width: 0 !important;
+        padding: 8px 13px !important;
+        border-radius: 18px 18px 5px 18px !important;
+        font-size: 17px !important;
+        line-height: 22px !important;
+    }
+}
