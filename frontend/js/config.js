@@ -1,9 +1,7 @@
 // ===== NEXUS AI — Frontend runtime config =====
-// Point this at your backend. Today it targets the existing live API.
-// When your Cloud Run backend is deployed, just swap this URL for the
-// Cloud Run URL (e.g. https://nexus-ai-api-xxxx.a.run.app) — nothing else changes.
+// Production backend now runs on Vercel.
 window.NEXUS_CONFIG = {
-    API_BASE: 'https://nexus-ai-api-gc555qtsga-ew.a.run.app',
+    API_BASE: 'https://nexus-ai-api-self.vercel.app',
     // Groq models exposed in the in-chat model selector.
     MODELS: [
         { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 · 70B', hint: 'Groq · le plus puissant' },
