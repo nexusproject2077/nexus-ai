@@ -302,6 +302,7 @@ app.post('/conversations', auth, ah(async (req, res) => {
     title: 'Nouvelle conversation',
     messages: [],
     history: [],
+    pinned: false,
     createdAt: new Date().toISOString(),
   };
   await store.convsCreate(conv);
@@ -311,11 +312,13 @@ app.post('/conversations', auth, ah(async (req, res) => {
 app.put('/conversations/:id', auth, ah(async (req, res) => {
   const conv = await store.convsGet(req.params.id);
   if (!conv || conv.userId !== req.user.id) return res.status(404).json({ error: 'Introuvable.' });
-  const { title, messages, history } = req.body || {};
+  const { title, messages, history, pinned } = req.body || {};
   const fields = {};
   if (title !== undefined) fields.title = title;
   if (messages !== undefined) fields.messages = messages;
   if (history !== undefined) fields.history = history;
+  if (pinned !== undefined) fields.pinned = Boolean(pinned);
+  fields.updatedAt = new Date().toISOString();
   const updated = await store.convsUpdate(req.params.id, fields);
   res.json(updated);
 }));
