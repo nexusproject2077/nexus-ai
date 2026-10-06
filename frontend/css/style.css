@@ -4179,3 +4179,15 @@ button,
         left: 10px !important;
     }
 }
+
+
+/* Mobile header spacing: shift the Nexus capsule slightly right so it has
+   comfortable breathing room from the sidebar control. */
+@media (max-width: 768px) {
+    .nexus-header,
+    #sidebar.hidden ~ #main-content .nexus-header {
+        left: calc(50% + 12px) !important;
+        width: calc(100vw - 112px) !important;
+        transform: translateX(-50%) !important;
+    }
+}
