@@ -601,7 +601,7 @@ async function saveConversationToServer(conv) {
         await fetch(`${API_BASE}/conversations/${conv._id}`, {
             method: 'PUT',
             headers: authHeaders(),
-            body: JSON.stringify({ title: conv.title, messages: conv.messages, history: conv.history })
+            body: JSON.stringify({ title: conv.title, messages: conv.messages, history: conv.history, pinned: !!conv.pinned })
         });
         lastSyncFingerprint = '';
     } catch (err) {
@@ -654,31 +654,94 @@ function updateConversationTitle(message) {
     }
 }
 
+function closeConversationMenus() {
+    document.querySelectorAll('.conversation-actions-menu').forEach(menu => menu.classList.add('hidden'));
+}
+
+window.toggleConversationMenu = function(id, event) {
+    event.stopPropagation();
+    const menu = document.getElementById('conv-menu-' + id);
+    const wasHidden = menu?.classList.contains('hidden');
+    closeConversationMenus();
+    if (menu && wasHidden) menu.classList.remove('hidden');
+};
+
+window.renameConversation = async function(id, event) {
+    event?.stopPropagation();
+    closeConversationMenus();
+    const conv = conversations.find(c => c._id === id);
+    if (!conv) return;
+    const title = prompt('Renommer la conversation', conv.title);
+    if (title === null) return;
+    const clean = title.trim();
+    if (!clean) return;
+    conv.title = clean.slice(0, 100);
+    renderConversationsList();
+    await saveConversationToServer(conv);
+};
+
+window.togglePinConversation = async function(id, event) {
+    event?.stopPropagation();
+    closeConversationMenus();
+    const conv = conversations.find(c => c._id === id);
+    if (!conv) return;
+    conv.pinned = !conv.pinned;
+    renderConversationsList();
+    await saveConversationToServer(conv);
+};
+
 function renderConversationsList() {
     if (!conversationsList) return;
     conversationsList.innerHTML = '';
-    const filtered = searchQuery
-        ? conversations.filter(c => c.title.toLowerCase().includes(searchQuery))
-        : conversations;
+    let filtered = searchQuery
+        ? conversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        : [...conversations];
+    filtered.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
     if (filtered.length === 0 && searchQuery) {
-        conversationsList.innerHTML = '<p style="color:rgba(255,255,255,0.2);font-size:0.78rem;text-align:center;padding:16px 0">Aucun resultat</p>';
+        conversationsList.innerHTML = '<p style="color:rgba(255,255,255,0.35);font-size:0.78rem;text-align:center;padding:16px 0">Aucun resultat</p>';
         return;
     }
+
+    const pinIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M6 3h12l-2 8 3 3H5l3-3Z"/></svg>';
+    const editIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
+    const trashIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>';
+    const moreIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';
+
     filtered.forEach(conv => {
         const item = document.createElement('div');
-        item.className = 'conversation-item' + (conv._id === currentConversationId ? ' active' : '');
-        const date    = new Date(conv.createdAt);
+        item.className = 'conversation-item' + (conv._id === currentConversationId ? ' active' : '') + (conv.pinned ? ' pinned' : '');
+        const date = new Date(conv.createdAt);
         const dateStr = date.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' });
         const timeStr = date.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
         item.innerHTML = `
-            <div class="conversation-title">${conv.title}</div>
+            <div class="conversation-title-row">
+                ${conv.pinned ? '<span class="conversation-pin-indicator">' + pinIcon + '</span>' : ''}
+                <div class="conversation-title">${escapeMemoryHTML(conv.title)}</div>
+            </div>
             <div class="conversation-date">${dateStr} ${timeStr}</div>
-            <button class="delete-conv-btn" onclick="deleteConversation('${conv._id}', event)">x</button>
+            <button class="conversation-more-btn" onclick="toggleConversationMenu('${conv._id}', event)" aria-label="Actions">${moreIcon}</button>
+            <div class="conversation-actions-menu hidden" id="conv-menu-${conv._id}" onclick="event.stopPropagation()">
+                <button onclick="togglePinConversation('${conv._id}', event)">${pinIcon}<span>${conv.pinned ? 'Desepingler' : 'Epingler'}</span></button>
+                <button onclick="renameConversation('${conv._id}', event)">${editIcon}<span>Renommer</span></button>
+                <button class="danger" onclick="deleteConversation('${conv._id}', event)">${trashIcon}<span>Supprimer</span></button>
+            </div>
         `;
-        item.addEventListener('click', () => loadConversation(conv._id));
+        item.addEventListener('click', () => { closeConversationMenus(); loadConversation(conv._id); });
+
+        let pressTimer = null;
+        item.addEventListener('pointerdown', e => {
+            if (e.target.closest('button') || e.pointerType === 'mouse') return;
+            pressTimer = setTimeout(() => toggleConversationMenu(conv._id, { stopPropagation(){} }), 520);
+        });
+        ['pointerup','pointercancel','pointerleave'].forEach(type => item.addEventListener(type, () => {
+            if (pressTimer) clearTimeout(pressTimer);
+            pressTimer = null;
+        }));
         conversationsList.appendChild(item);
     });
 }
+
+document.addEventListener('click', closeConversationMenus);
 
 if (newChatBtn) newChatBtn.addEventListener('click', createNewConversation);
 
