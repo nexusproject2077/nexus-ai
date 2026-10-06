@@ -3234,7 +3234,16 @@ body::after,
 .model-option.active { background: rgba(10,132,255,.16); border-color: transparent; }
 
 /* Chat */
-#chat-box,
+#chat-box {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-radius: 0 !important;
+    padding: 24px;
+}
+
 .liquid-glass {
     background: rgba(28,28,30,.50) !important;
     border: 1px solid rgba(255,255,255,.075) !important;
@@ -3243,8 +3252,6 @@ body::after,
     backdrop-filter: blur(36px) saturate(135%) !important;
     -webkit-backdrop-filter: blur(36px) saturate(135%) !important;
 }
-
-#chat-box { padding: 24px; }
 #chat-box::before,
 #input-container::before,
 .settings-modal::before,
