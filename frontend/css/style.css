@@ -4003,3 +4003,10 @@ button,
     outline: 3px solid rgba(0,145,255,.26) !important;
     outline-offset: 2px !important;
 }
+
+
+/* Hide the outside sidebar toggle whenever the sidebar is open.
+   Only the inside header control remains visible in the expanded drawer. */
+#sidebar:not(.hidden) ~ #toggle-sidebar-outside {
+    display: none !important;
+}
