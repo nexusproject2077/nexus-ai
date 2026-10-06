@@ -4136,3 +4136,30 @@ button,
         left: calc(50% + 24px) !important;
     }
 }
+
+
+/* Mobile composer: prevent placeholder/text from wrapping and being clipped. */
+@media (max-width: 768px) {
+    #input-container {
+        min-height: 60px !important;
+        height: auto !important;
+        padding: 8px 10px !important;
+        align-items: center !important;
+    }
+
+    #user-input {
+        min-width: 0 !important;
+        min-height: 40px !important;
+        height: 40px !important;
+        max-height: 40px !important;
+        padding: 9px 6px !important;
+        line-height: 22px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        resize: none !important;
+    }
+
+    #user-input::placeholder {
+        white-space: nowrap !important;
+    }
+}
