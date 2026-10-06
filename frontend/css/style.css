@@ -3915,3 +3915,91 @@ button,
         min-height: 64px !important;
     }
 }
+
+
+/* =====================================================================
+   iOS 27 ACCESSIBILITY PASS — LIGHT AUTH CONTRAST
+   Fixes unreadable labels/buttons on the light login screen.
+   ===================================================================== */
+#auth-page .auth-tab {
+    color: rgba(60,60,67,.82) !important;
+}
+
+#auth-page .auth-tab:hover:not(.active) {
+    color: rgba(28,28,30,.96) !important;
+    background: rgba(255,255,255,.46) !important;
+}
+
+#auth-page .auth-tab.active {
+    color: #111114 !important;
+}
+
+#auth-page .social-btn {
+    color: #1c1c1e !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.88), rgba(255,255,255,.68)),
+        rgba(120,120,128,.10) !important;
+    border: 1px solid rgba(60,60,67,.14) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.96),
+        inset 0 -1px 0 rgba(60,60,67,.10),
+        0 2px 5px rgba(0,0,0,.05) !important;
+}
+
+#auth-page .social-btn:hover {
+    color: #111114 !important;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.98), rgba(245,245,247,.88)),
+        rgba(120,120,128,.12) !important;
+    border-color: rgba(60,60,67,.18) !important;
+}
+
+#auth-page .social-btn:active {
+    background: rgba(209,209,214,.58) !important;
+    color: #111114 !important;
+}
+
+#auth-page .auth-divider {
+    color: rgba(60,60,67,.60) !important;
+}
+
+#auth-page .auth-divider::before,
+#auth-page .auth-divider::after {
+    background: rgba(60,60,67,.20) !important;
+}
+
+#auth-page .auth-field label {
+    color: rgba(60,60,67,.72) !important;
+}
+
+#auth-page .auth-field input {
+    color: #111114 !important;
+    background: rgba(118,118,128,.11) !important;
+    border-color: rgba(60,60,67,.10) !important;
+}
+
+#auth-page .auth-field input::placeholder {
+    color: rgba(60,60,67,.42) !important;
+}
+
+#auth-page .auth-subtitle {
+    color: rgba(60,60,67,.62) !important;
+}
+
+#auth-page .auth-error {
+    color: #d70015 !important;
+}
+
+#auth-page .social-btn svg {
+    opacity: 1 !important;
+}
+
+#auth-page .auth-btn {
+    color: #fff !important;
+}
+
+#auth-page button:focus-visible,
+#auth-page input:focus-visible {
+    outline: 3px solid rgba(0,145,255,.26) !important;
+    outline-offset: 2px !important;
+}
