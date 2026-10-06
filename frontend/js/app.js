@@ -7,6 +7,10 @@ const TAVILY_KEY = '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';
 
 // ===== ÉTAT MODÈLE (sélecteur Groq) =====
 let currentModel = localStorage.getItem('nexus_model') || NEXUS_CFG.DEFAULT_MODEL || MODELS[0].id;
+if (!MODELS.some(m => m.id === currentModel)) {
+    currentModel = NEXUS_CFG.DEFAULT_MODEL || MODELS[0].id;
+    localStorage.setItem('nexus_model', currentModel);
+}
 function currentModelLabel() {
     return (MODELS.find(m => m.id === currentModel) || MODELS[0]).label;
 }
@@ -1478,6 +1482,7 @@ function initModelSelector() {
     const menu = document.getElementById('model-menu');
     const nameEl = document.getElementById('current-model-name');
     if (nameEl) nameEl.textContent = currentModelLabel();
+    updateProviderUI();
     if (!menu) return;
     menu.innerHTML = MODELS.map(m => `
         <button class="model-option${m.id === currentModel ? ' active' : ''}" data-model="${m.id}" onclick="selectModel('${m.id}')">
@@ -1495,6 +1500,14 @@ window.toggleModelMenu = function(e) {
     const open = menu.classList.toggle('hidden');
     if (btn) btn.classList.toggle('open', !open);
 };
+
+function updateProviderUI() {
+    const isGemini = currentModel.startsWith('gemini-');
+    const tag = document.querySelector('.powered-tag');
+    if (tag) tag.textContent = isGemini ? 'Propulsé par Google Gemini' : 'Propulsé par Groq';
+    const footer = document.querySelector('.footer');
+    if (footer) footer.innerHTML = '<span class="nexus-brand">NEXUS</span> · IA Avancée · ' + (isGemini ? 'Google Gemini' : 'Groq');
+}
 
 window.selectModel = function(id) {
     currentModel = id;
@@ -1563,7 +1576,7 @@ function renderEmptyState() {
             <div class="empty-logo"><span class="nexus-logo">NEXUS</span> <span class="ai-label">AI</span></div>
             <div class="groq-banner">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
-                Propulsé par Groq — <strong>Réponses instantanées</strong>
+                ${currentModel.startsWith('gemini-') ? 'Propulsé par Google Gemini' : 'Propulsé par Groq'} — <strong>Réponses instantanées</strong>
             </div>
             <p class="empty-subtitle">Par où veux-tu commencer ?</p>
             <div class="suggestion-grid">${cards}</div>
