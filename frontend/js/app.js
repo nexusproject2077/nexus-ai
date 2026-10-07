@@ -627,18 +627,36 @@ window.deleteConversation = async function(id, event) {
     }
 };
 
-function loadConversation(id) {
+async function loadConversation(id) {
     currentConversationId = id;
     const conv = conversations.find(c => c._id === id);
     if (!conv) return;
+
+    // Avoid briefly showing the beginning of a long conversation while it is restored.
+    chatBox.style.visibility = 'hidden';
     chatBox.innerHTML = '';
-    conv.messages.forEach(msg => {
-        if (msg.type === 'user') addMessage('user-message', msg.content, false, false);
-        else addMessage('bot-message', msg.content, true, false);
-    });
+
+    for (const msg of conv.messages) {
+        if (msg.type === 'user') await addMessage('user-message', msg.content, false, false);
+        else await addMessage('bot-message', msg.content, true, false);
+    }
+
     if (conv.messages.length === 0) renderEmptyState();
     renderConversationsList();
-    setTimeout(() => { chatBox.scrollTop = chatBox.scrollHeight; }, 100);
+
+    const revealAtBottom = () => {
+        chatBox.scrollTop = chatBox.scrollHeight;
+        const lastMessage = chatBox.lastElementChild;
+        if (lastMessage) lastMessage.scrollIntoView({ block: 'end', behavior: 'auto' });
+        chatBox.style.visibility = 'visible';
+    };
+
+    // Wait for layout/fonts/table rendering, then lock onto the latest message.
+    requestAnimationFrame(() => {
+        requestAnimationFrame(revealAtBottom);
+    });
+    setTimeout(revealAtBottom, 120);
+    setTimeout(revealAtBottom, 350);
 }
 
 function getCurrentConversation() {
