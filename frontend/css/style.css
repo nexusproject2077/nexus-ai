@@ -4346,5 +4346,5 @@ button,
 
 /* Fine-tune Nexus AI vertical centering inside Dynamic Island pill */
 .nexus-header-inner h1 {
-    transform: translateY(2px) !important;
+    transform: translateY(4px) !important;
 }
