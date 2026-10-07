@@ -11,7 +11,7 @@
 // ===============================================================
 import { randomUUID } from 'node:crypto';
 import { getFirebaseAdmin } from './firebase-admin.js';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 
 const USE_FIRESTORE = process.env.USE_FIRESTORE === 'true';
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -133,21 +133,39 @@ async function createMongoStore(uri, dbName) {
     convsCol.createIndex({ userId: 1, updatedAt: -1, createdAt: -1 }),
   ]);
 
-  const clean = doc => {
+  const cleanUser = doc => {
     if (!doc) return null;
-    const { _mongoId, ...rest } = doc;
-    return rest;
+    return {
+      ...doc,
+      id: doc.id || String(doc._id),
+      _id: doc._id ? String(doc._id) : doc._id,
+    };
+  };
+
+  const cleanConv = doc => {
+    if (!doc) return null;
+    return {
+      ...doc,
+      _id: String(doc._id),
+      userId: doc.userId != null ? String(doc.userId) : doc.userId,
+    };
+  };
+
+  const idFilter = id => {
+    const values = [id];
+    if (ObjectId.isValid(id)) values.push(new ObjectId(id));
+    return { _id: { $in: values } };
   };
 
   return {
     kind: 'mongodb',
 
     async usersGetByEmail(email) {
-      return clean(await usersCol.findOne({ email }));
+      return cleanUser(await usersCol.findOne({ email }));
     },
 
     async usersGetById(id) {
-      return clean(await usersCol.findOne({ id }));
+      return cleanUser(await usersCol.findOne({ $or: [{ id }, ...(ObjectId.isValid(id) ? [{ _id: new ObjectId(id) }] : [])] }));
     },
 
     async usersCreate(user) {
@@ -173,11 +191,11 @@ async function createMongoStore(uri, dbName) {
         .find({ userId })
         .sort({ updatedAt: -1, createdAt: -1 })
         .toArray())
-        .map(clean);
+        .map(cleanConv);
     },
 
     async convsGet(id) {
-      return clean(await convsCol.findOne({ _id: id }));
+      return cleanConv(await convsCol.findOne(idFilter(id)));
     },
 
     async convsCreate(conv) {
@@ -191,15 +209,15 @@ async function createMongoStore(uri, dbName) {
 
     async convsUpdate(id, fields) {
       const result = await convsCol.findOneAndUpdate(
-        { _id: id },
+        idFilter(id),
         { $set: { ...fields } },
         { returnDocument: 'after' }
       );
-      return clean(result);
+      return cleanConv(result);
     },
 
     async convsDelete(id) {
-      await convsCol.deleteOne({ _id: id });
+      await convsCol.deleteOne(idFilter(id));
     },
   };
 }
