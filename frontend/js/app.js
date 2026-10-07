@@ -515,6 +515,25 @@ window.removeFile = function(index) {
 };
 
 // ===== SYNCHRONISATION MULTI-APPAREILS =====
+function normalizeConversation(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    return {
+        ...raw,
+        _id: String(raw._id ?? ''),
+        title: String(raw.title || 'Nouvelle conversation'),
+        messages: Array.isArray(raw.messages) ? raw.messages : [],
+        history: Array.isArray(raw.history) ? raw.history : [],
+        pinned: !!raw.pinned,
+        createdAt: raw.createdAt || raw.updatedAt || new Date().toISOString(),
+    };
+}
+
+function normalizeConversationList(list) {
+    return (Array.isArray(list) ? list : [])
+        .map(normalizeConversation)
+        .filter(c => c && c._id);
+}
+
 // Uses the existing API/Firestore storage, so no extra paid service is required.
 function conversationFingerprint(list) {
     return JSON.stringify((list || []).map(c => [c._id, c.title, c.updatedAt || c.createdAt, (c.messages || []).length]));
@@ -530,7 +549,7 @@ async function syncConversationsFromServer(force = false) {
     try {
         const res = await fetch(`${API_BASE}/conversations`, { headers: authHeaders(), cache: 'no-store' });
         if (!res.ok) return;
-        const remote = await res.json();
+        const remote = normalizeConversationList(await res.json());
         const fingerprint = conversationFingerprint(remote);
         if (fingerprint === lastSyncFingerprint) return;
 
@@ -581,21 +600,36 @@ window.addEventListener('focus', () => {
 
 // ===== API CONVERSATIONS =====
 async function loadConversationsFromServer() {
+    let remote;
     try {
-        const res = await fetch(`${API_BASE}/conversations`, { headers: authHeaders() });
+        const res = await fetch(`${API_BASE}/conversations`, {
+            headers: authHeaders(),
+            cache: 'no-store'
+        });
         if (res.status === 401) { handleLogout(); return; }
+        if (!res.ok) throw new Error(`Chargement conversations impossible (${res.status})`);
+        remote = normalizeConversationList(await res.json());
+    } catch (err) {
+        console.error('Erreur chargement conversations:', err);
+        if (!conversations.length) createNewConversation();
+        showToast('Impossible de charger les conversations. Réessaie dans un instant.', 'error', 3500);
+        return;
+    }
 
-        const remote = await res.json();
-        conversations = Array.isArray(remote) ? remote : [];
-        lastSyncFingerprint = conversationFingerprint(conversations);
+    conversations = remote;
+    lastSyncFingerprint = conversationFingerprint(conversations);
+    renderConversationsList();
 
-        if (conversations.length === 0) createNewConversation();
-        else loadConversation(conversations[0]._id);
-
-        renderConversationsList();
-    } catch {
-        conversations = [];
+    if (conversations.length === 0) {
         createNewConversation();
+        return;
+    }
+
+    try {
+        await loadConversation(conversations[0]._id);
+    } catch (err) {
+        console.error('Erreur affichage conversation:', err);
+        renderConversationsList();
     }
 }
 
@@ -708,12 +742,16 @@ async function loadConversation(id) {
     chatBox.style.visibility = 'hidden';
     chatBox.innerHTML = '';
 
-    for (const msg of conv.messages) {
-        if (msg.type === 'user') await addMessage('user-message', msg.content, false, false);
-        else await addMessage('bot-message', msg.content, true, false);
+    const safeMessages = Array.isArray(conv.messages) ? conv.messages : [];
+    for (const msg of safeMessages) {
+        const role = msg?.type || msg?.role || msg?.sender || '';
+        const content = msg?.content ?? msg?.text ?? msg?.message ?? '';
+        if (!content) continue;
+        if (role === 'user' || role === 'human') await addMessage('user-message', String(content), false, false);
+        else await addMessage('bot-message', String(content), true, false);
     }
 
-    if (conv.messages.length === 0) renderEmptyState();
+    if (safeMessages.length === 0) renderEmptyState();
     renderConversationsList();
 
     const restoredId = id;
@@ -853,7 +891,7 @@ function renderConversationsList() {
     conversationsList.innerHTML = '';
     const savedConversations = conversations.filter(c => !c._localDraft);
     let filtered = searchQuery
-        ? savedConversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        ? savedConversations.filter(c => String(c.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
         : [...savedConversations];
     filtered.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
     if (filtered.length === 0 && searchQuery) {
