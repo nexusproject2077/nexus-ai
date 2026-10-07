@@ -750,6 +750,12 @@ function markdownToHTML(text) {
     const codeBlocks = [];
     const tableBlocks = [];
 
+    const renderInlineMarkdown = (value) => String(value ?? '')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
     text = String(text || '').replace(/```(\w+)?\n?([\s\S]+?)```/g, (_, lang, code) => {
         const token = `@@NEXUS_CODE_${codeBlocks.length}@@`;
         const langAttr = lang ? ` class="language-${lang}"` : '';
@@ -778,7 +784,6 @@ function markdownToHTML(text) {
             while (i < lines.length) {
                 const candidate = lines[i].trim();
                 if (!candidate) {
-                    // Allow an occasional blank line inside generated tables.
                     if (lines[i + 1]?.includes('|')) { i++; continue; }
                     break;
                 }
@@ -791,9 +796,9 @@ function markdownToHTML(text) {
             i--;
 
             if (headers.length >= 2 && rows.length) {
-                const head = '<thead><tr>' + headers.map(cell => '<th>' + cell + '</th>').join('') + '</tr></thead>';
+                const head = '<thead><tr>' + headers.map(cell => '<th>' + renderInlineMarkdown(cell) + '</th>').join('') + '</tr></thead>';
                 const body = '<tbody>' + rows.map(row =>
-                    '<tr>' + headers.map((_, col) => '<td>' + (row[col] || '') + '</td>').join('') + '</tr>'
+                    '<tr>' + headers.map((_, col) => '<td>' + renderInlineMarkdown(row[col] || '') + '</td>').join('') + '</tr>'
                 ).join('') + '</tbody>';
                 const token = `@@NEXUS_TABLE_${tableBlocks.length}@@`;
                 tableBlocks.push('<div class="md-table-wrap"><table class="md-table">' + head + body + '</table></div>');
@@ -809,15 +814,17 @@ function markdownToHTML(text) {
     // Block separators.
     text = text.replace(/^\s*---+\s*$/gm, '<hr>');
 
-    // Inline Markdown.
-    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // Headings, including #### / ##### / ######.
+    text = text.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
+    text = text.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>');
+    text = text.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
     text = text.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
     text = text.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
     text = text.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
+
+    // Inline Markdown outside tables.
+    text = renderInlineMarkdown(text);
     text = text.replace(/^>\s+(.+)$/gm, '<blockquote>$1</blockquote>');
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 
     // Ordered and unordered lists.
     text = text.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>');
@@ -830,7 +837,7 @@ function markdownToHTML(text) {
     // Paragraphs / line breaks while preserving structural placeholders.
     const blocks = text.split(/\n{2,}/).map(chunk => chunk.trim()).filter(Boolean);
     text = blocks.map(chunk => {
-        if (/^(<h[1-3]|<ul>|<ol>|<blockquote>|<hr>|@@NEXUS_TABLE_|@@NEXUS_CODE_)/.test(chunk)) {
+        if (/^(<h[1-6]|<ul>|<ol>|<blockquote>|<hr>|@@NEXUS_TABLE_|@@NEXUS_CODE_)/.test(chunk)) {
             return chunk.replace(/\n/g, '');
         }
         return '<p>' + chunk.replace(/\n/g, '<br>') + '</p>';
