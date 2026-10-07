@@ -11,8 +11,11 @@
 // ===============================================================
 import { randomUUID } from 'node:crypto';
 import { getFirebaseAdmin } from './firebase-admin.js';
+import { MongoClient } from 'mongodb';
 
 const USE_FIRESTORE = process.env.USE_FIRESTORE === 'true';
+const MONGODB_URI = process.env.MONGODB_URI || '';
+const MONGODB_DB = process.env.MONGODB_DB || 'nexusai';
 
 // ---------------------------------------------------------------
 //  IN-MEMORY BACKEND
@@ -106,20 +109,123 @@ function createFirestoreStore(db) {
 }
 
 // ---------------------------------------------------------------
+//  MONGODB ATLAS BACKEND
+// ---------------------------------------------------------------
+let _mongoClient = null;
+
+async function createMongoStore(uri, dbName) {
+  if (!_mongoClient) {
+    _mongoClient = new MongoClient(uri, {
+      maxPoolSize: 8,
+      minPoolSize: 0,
+      serverSelectionTimeoutMS: 8000,
+    });
+    await _mongoClient.connect();
+  }
+
+  const db = _mongoClient.db(dbName);
+  const usersCol = db.collection('users');
+  const convsCol = db.collection('conversations');
+
+  // Keep compatibility with the existing Nexus documents.
+  await Promise.allSettled([
+    usersCol.createIndex({ email: 1 }, { unique: true, sparse: true }),
+    convsCol.createIndex({ userId: 1, updatedAt: -1, createdAt: -1 }),
+  ]);
+
+  const clean = doc => {
+    if (!doc) return null;
+    const { _mongoId, ...rest } = doc;
+    return rest;
+  };
+
+  return {
+    kind: 'mongodb',
+
+    async usersGetByEmail(email) {
+      return clean(await usersCol.findOne({ email }));
+    },
+
+    async usersGetById(id) {
+      return clean(await usersCol.findOne({ id }));
+    },
+
+    async usersCreate(user) {
+      await usersCol.updateOne(
+        { id: user.id },
+        { $setOnInsert: { ...user } },
+        { upsert: true }
+      );
+      return user;
+    },
+
+    async usersSave(user) {
+      await usersCol.updateOne(
+        { id: user.id },
+        { $set: { ...user } },
+        { upsert: true }
+      );
+      return user;
+    },
+
+    async convsListByUser(userId) {
+      return (await convsCol
+        .find({ userId })
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .toArray())
+        .map(clean);
+    },
+
+    async convsGet(id) {
+      return clean(await convsCol.findOne({ _id: id }));
+    },
+
+    async convsCreate(conv) {
+      await convsCol.updateOne(
+        { _id: conv._id },
+        { $setOnInsert: { ...conv } },
+        { upsert: true }
+      );
+      return conv;
+    },
+
+    async convsUpdate(id, fields) {
+      const result = await convsCol.findOneAndUpdate(
+        { _id: id },
+        { $set: { ...fields } },
+        { returnDocument: 'after' }
+      );
+      return clean(result);
+    },
+
+    async convsDelete(id) {
+      await convsCol.deleteOne({ _id: id });
+    },
+  };
+}
+
+// ---------------------------------------------------------------
 //  FACTORY
 // ---------------------------------------------------------------
 let _store = null;
 
 export async function getStore() {
   if (_store) return _store;
-  if (USE_FIRESTORE) {
+
+  // Prefer MongoDB Atlas whenever a URI is configured. Firestore remains
+  // available only as a fallback during migration.
+  if (MONGODB_URI) {
+    _store = await createMongoStore(MONGODB_URI, MONGODB_DB);
+    console.log(`Storage: MongoDB Atlas (${MONGODB_DB})`);
+  } else if (USE_FIRESTORE) {
     const admin = getFirebaseAdmin();
     _store = createFirestoreStore(admin.firestore());
     console.log('Storage: Firestore');
   } else {
     _store = createMemoryStore();
-    console.log('Storage: in-memory (set USE_FIRESTORE=true to persist)');
+    console.log('Storage: in-memory (configure MONGODB_URI for persistence)');
   }
+
   return _store;
 }
 
