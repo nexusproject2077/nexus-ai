@@ -773,6 +773,19 @@ document.addEventListener('click', closeConversationMenus);
 
 if (newChatBtn) newChatBtn.addEventListener('click', createNewConversation);
 
+const newChatCollapsedBtn = document.getElementById('new-chat-collapsed');
+if (newChatCollapsedBtn) newChatCollapsedBtn.addEventListener('click', createNewConversation);
+
+document.addEventListener('keydown', (e) => {
+    const chatPage = document.getElementById('chat-page');
+    const inChat = chatPage && !chatPage.classList.contains('hidden');
+    if (!inChat) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        createNewConversation();
+    }
+});
+
 // ===== MARKDOWN =====
 function markdownToHTML(text) {
     const codeBlocks = [];
