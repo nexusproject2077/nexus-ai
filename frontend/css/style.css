@@ -4569,3 +4569,26 @@ button,
         display: none;
     }
 }
+
+
+/* Sidebar brand — same typography as the former Dynamic Island title */
+.sidebar-nexus-title {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    margin: 2px 0 18px;
+    padding-left: 2px;
+    white-space: nowrap;
+}
+.sidebar-nexus-title .nexus-logo,
+.sidebar-nexus-title .ai-label {
+    font-size: inherit !important;
+    line-height: inherit !important;
+}
+
+/* Keep the top pill intentionally empty for the next feature */
+.nexus-header-inner {
+    min-height: 100%;
+}
