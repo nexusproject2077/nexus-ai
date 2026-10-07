@@ -198,7 +198,6 @@ async function createMongoStore(uri, dbName) {
       const mergedMemory = [...new Set(scored.flatMap(x => Array.isArray(x.clean.memory) ? x.clean.memory : []))];
       const mergedSettings = Object.assign({}, ...scored.map(x => x.clean.settings || {}));
       const merged = {
-        ...duplicates.reverse().reduce((acc, x) => ({ ...acc, ...x.clean }), {}),
         ...primary.clean,
         email,
         memory: mergedMemory,
@@ -206,6 +205,7 @@ async function createMongoStore(uri, dbName) {
         phone: primary.clean.phone || scored.find(x => x.clean.phone)?.clean.phone || '',
         sidebarState: primary.clean.sidebarState || scored.find(x => x.clean.sidebarState)?.clean.sidebarState || 'visible',
       };
+      delete merged._id;
 
       // Re-link all conversations from duplicate account IDs to the primary account.
       for (const x of scored) {
@@ -225,14 +225,16 @@ async function createMongoStore(uri, dbName) {
         ? { _id: primary.doc._id }
         : idFilter(primary.clean.id);
 
+      // Delete duplicates first so legacy unique indexes (e.g. username_1)
+      // cannot block the final write to the surviving account.
+      for (const x of duplicates) {
+        await usersCol.deleteOne({ _id: x.doc._id });
+      }
+
       await usersCol.updateOne(
         primaryFilter,
         { $set: { ...merged, id: primary.clean.id } }
       );
-
-      for (const x of duplicates) {
-        await usersCol.deleteOne({ _id: x.doc._id });
-      }
 
       // Recreate the unique email index after duplicate cleanup when possible.
       await usersCol.createIndex({ email: 1 }, { unique: true, sparse: true }).catch(() => {});
@@ -254,12 +256,25 @@ async function createMongoStore(uri, dbName) {
         ? { $or: [{ id: user.id }, { _id: new ObjectId(user.id) }] }
         : { id: user.id };
 
+      // Never write MongoDB's immutable _id back into $set, and only persist
+      // fields Nexus actually edits after account creation.
+      const mutable = {
+        id: user.id,
+        email: user.email,
+        phone: user.phone || '',
+        settings: user.settings || {},
+        memory: Array.isArray(user.memory) ? user.memory : [],
+        sidebarState: user.sidebarState || 'visible',
+        provider: user.provider || 'password',
+      };
+      if (user.passwordHash !== undefined) mutable.passwordHash = user.passwordHash;
+
       await usersCol.updateOne(
         filter,
-        { $set: { ...user, id: user.id } },
+        { $set: mutable },
         { upsert: true }
       );
-      return user;
+      return { ...user, ...mutable };
     },
 
     async convsListByUser(userId) {
