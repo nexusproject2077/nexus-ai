@@ -193,8 +193,12 @@
                 <div class="nexus-header-inner"></div>
             </header>
 
-            <!-- Barre d'outils : sélecteur de modèle rapproché du chat -->
-            <div class="chat-toolbar" id="chat-toolbar">
+            <div class="uploaded-files-container" id="uploaded-files"></div>
+            <div id="chat-box"></div>
+
+            <div id="input-container">
+                <input type="file" id="file-input" accept=".txt,.pdf,.doc,.docx,.jpg,.png,.jpeg,.gif,.xlsx,.xls" multiple>
+
                 <div class="model-selector" id="model-selector">
                     <button class="model-selector-btn" id="model-selector-btn" onclick="toggleModelMenu(event)" title="Choisir le modèle IA">
                         <span class="status-dot"></span>
@@ -203,13 +207,6 @@
                     </button>
                     <div class="model-menu hidden" id="model-menu"></div>
                 </div>
-            </div>
-
-            <div class="uploaded-files-container" id="uploaded-files"></div>
-            <div id="chat-box"></div>
-
-            <div id="input-container">
-                <input type="file" id="file-input" accept=".txt,.pdf,.doc,.docx,.jpg,.png,.jpeg,.gif,.xlsx,.xls" multiple>
 
                 <a href="https://nexusproject2077.github.io/nexus-hub/index.html" id="home-btn" title="Retour à l'accueil Nexus">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
