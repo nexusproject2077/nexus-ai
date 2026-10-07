@@ -4592,3 +4592,12 @@ button,
 .nexus-header-inner {
     min-height: 100%;
 }
+
+
+/* Center the Nexus AI brand in the sidebar */
+.sidebar-nexus-title {
+    width: 100% !important;
+    text-align: center !important;
+    padding-left: 0 !important;
+    margin: 2px 0 18px !important;
+}
