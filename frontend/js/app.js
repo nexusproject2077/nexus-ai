@@ -644,43 +644,29 @@ async function loadConversation(id) {
     if (conv.messages.length === 0) renderEmptyState();
     renderConversationsList();
 
+    const restoredId = id;
     const revealAtBottom = () => {
-        // The conversation can scroll through the page itself on desktop,
-        // while chatBox may also be scrollable depending on the viewport.
-        chatBox.scrollTop = chatBox.scrollHeight;
+        if (currentConversationId !== restoredId) return;
 
-        const scroller = document.scrollingElement || document.documentElement;
-        const bottom = Math.max(
-            document.body.scrollHeight,
-            document.documentElement.scrollHeight,
-            scroller.scrollHeight
-        );
-        scroller.scrollTop = bottom;
-        window.scrollTo({ top: bottom, left: 0, behavior: 'auto' });
-
-        // Keep the final answer just above the fixed composer instead of
-        // stopping part-way through a long message.
-        const lastMessage = chatBox.lastElementChild;
-        if (lastMessage) {
-            lastMessage.scrollIntoView({ block: 'end', behavior: 'auto' });
-            const finalBottom = Math.max(
-                document.body.scrollHeight,
-                document.documentElement.scrollHeight,
-                scroller.scrollHeight
-            );
-            scroller.scrollTop = finalBottom;
-            window.scrollTo({ top: finalBottom, left: 0, behavior: 'auto' });
+        // Scroll every actual conversation/page scroll container to its exact
+        // maximum (scrollHeight - clientHeight), rather than estimating a page Y.
+        const page = document.scrollingElement || document.documentElement;
+        const main = document.getElementById('main-content');
+        for (const el of [chatBox, main, page, document.body, document.documentElement]) {
+            if (el && el.scrollHeight > el.clientHeight) {
+                el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+            }
         }
-
         chatBox.style.visibility = 'visible';
     };
 
-    // Wait for layout/fonts/table rendering, then lock onto the latest message.
-    requestAnimationFrame(() => {
-        requestAnimationFrame(revealAtBottom);
-    });
-    setTimeout(revealAtBottom, 120);
-    setTimeout(revealAtBottom, 350);
+    // Fonts and Markdown tables can change document height after rendering.
+    // Keep scrolling to the exact end briefly while the layout stabilizes.
+    requestAnimationFrame(() => requestAnimationFrame(revealAtBottom));
+    [100, 300, 650, 1200].forEach(delay => setTimeout(revealAtBottom, delay));
+    if (document.fonts?.ready) {
+        document.fonts.ready.then(revealAtBottom).catch(() => {});
+    }
 }
 
 function getCurrentConversation() {
