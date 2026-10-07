@@ -4818,3 +4818,17 @@ button,
         max-width: calc(100vw - 24px) !important;
     }
 }
+
+
+/* Let the model popover escape the composer and render above it */
+#input-container {
+    overflow: visible !important;
+}
+#input-container .model-selector {
+    z-index: 1200 !important;
+}
+#input-container .model-menu {
+    z-index: 1300 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
