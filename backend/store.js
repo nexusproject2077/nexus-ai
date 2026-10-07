@@ -164,6 +164,37 @@ async function createMongoStore(uri, dbName) {
       return cleanUser(await usersCol.findOne({ email }));
     },
 
+    async debugAccountLinks() {
+      const users = await usersCol.find({}, { projection: { passwordHash: 0, memory: 0, settings: 0 } }).toArray();
+      const groups = await convsCol.aggregate([
+        { $group: { _id: { value: '$userId', type: { $type: '$userId' } }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]).toArray();
+      const sample = await convsCol.find({}, { projection: { messages: 0, history: 0 } }).limit(5).toArray();
+      return {
+        users: users.map(u => ({
+          mongoId: String(u._id),
+          id: u.id != null ? String(u.id) : null,
+          email: u.email || null,
+          username: u.username || null,
+          provider: u.provider || null,
+          createdAt: u.createdAt || null,
+        })),
+        conversationGroups: groups.map(g => ({
+          userId: g._id?.value != null ? String(g._id.value) : null,
+          userIdType: g._id?.type || null,
+          count: g.count,
+        })),
+        sampleFields: sample.map(c => ({
+          id: String(c._id),
+          userId: c.userId != null ? String(c.userId) : null,
+          userIdType: c.userId?.constructor?.name || typeof c.userId,
+          keys: Object.keys(c),
+          title: c.title || null,
+        })),
+      };
+    },
+
     async usersGetById(id) {
       return cleanUser(await usersCol.findOne({ $or: [{ id }, ...(ObjectId.isValid(id) ? [{ _id: new ObjectId(id) }] : [])] }));
     },
