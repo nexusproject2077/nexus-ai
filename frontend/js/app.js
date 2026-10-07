@@ -532,10 +532,14 @@ async function syncConversationsFromServer() {
         const activeId = currentConversationId;
         const activeBefore = conversations.find(c => c._id === activeId);
         const activeRemote = remote.find(c => c._id === activeId);
-        conversations = remote;
+        const localDraft = conversations.find(c => c._localDraft);
+        conversations = localDraft ? [localDraft, ...remote] : remote;
         lastSyncFingerprint = fingerprint;
 
         renderConversationsList();
+
+        // Never replace an unsent local draft with server state.
+        if (localDraft && activeId === localDraft._id) return;
 
         // Refresh the open conversation only when its server version actually changed.
         if (activeRemote) {
@@ -569,34 +573,94 @@ window.addEventListener('focus', () => {
 });
 
 // ===== API CONVERSATIONS =====
+async function cleanupLegacyEmptyConversations(list) {
+    const emptyLegacy = (list || []).filter(conv =>
+        !conv._localDraft &&
+        (!Array.isArray(conv.messages) || conv.messages.length === 0) &&
+        (conv.title === 'Nouvelle conversation' || !String(conv.title || '').trim())
+    );
+
+    if (!emptyLegacy.length) return list || [];
+
+    await Promise.allSettled(emptyLegacy.map(conv =>
+        fetch(`${API_BASE}/conversations/${conv._id}`, {
+            method: 'DELETE',
+            headers: authHeaders()
+        })
+    ));
+
+    const emptyIds = new Set(emptyLegacy.map(conv => conv._id));
+    return (list || []).filter(conv => !emptyIds.has(conv._id));
+}
+
 async function loadConversationsFromServer() {
     try {
         const res = await fetch(`${API_BASE}/conversations`, { headers: authHeaders() });
         if (res.status === 401) { handleLogout(); return; }
-        conversations = await res.json();
+
+        const remote = await res.json();
+        conversations = await cleanupLegacyEmptyConversations(remote);
         lastSyncFingerprint = conversationFingerprint(conversations);
-        if (conversations.length === 0) await createNewConversation();
+
+        if (conversations.length === 0) createNewConversation();
         else loadConversation(conversations[0]._id);
+
         renderConversationsList();
     } catch {
         conversations = [];
-        await createNewConversation();
+        createNewConversation();
     }
 }
 
-async function createNewConversation() {
+function createNewConversation() {
+    // A new chat stays entirely local until the user sends the first message.
+    // This prevents empty conversations from being stored in Firestore.
+    conversations = conversations.filter(c => !c._localDraft);
+
+    const draft = {
+        _id: `draft-${Date.now()}`,
+        title: 'Nouvelle conversation',
+        messages: [],
+        history: [],
+        pinned: false,
+        createdAt: new Date().toISOString(),
+        _localDraft: true
+    };
+
+    conversations.unshift(draft);
+    loadConversation(draft._id);
+    renderConversationsList();
+}
+
+async function ensureCurrentConversationPersisted() {
+    const draft = getCurrentConversation();
+    if (!draft) return null;
+    if (!draft._localDraft) return draft;
+
     try {
-        const res  = await fetch(`${API_BASE}/conversations`, { method: 'POST', headers: authHeaders() });
-        const conv = await res.json();
-        conversations.unshift(conv);
-        loadConversation(conv._id);
+        const res = await fetch(`${API_BASE}/conversations`, {
+            method: 'POST',
+            headers: authHeaders()
+        });
+        if (!res.ok) throw new Error('Creation conversation impossible.');
+
+        const persisted = await res.json();
+        const index = conversations.findIndex(c => c._id === draft._id);
+        if (index !== -1) conversations[index] = persisted;
+        currentConversationId = persisted._id;
+        lastSyncFingerprint = '';
+
         renderConversationsList();
+        return persisted;
     } catch (err) {
         console.error('Erreur creation conversation:', err);
+        showToast('Impossible de creer la conversation.', 'error');
+        return null;
     }
 }
 
 async function saveConversationToServer(conv) {
+    if (!conv || conv._localDraft) return;
     try {
         await fetch(`${API_BASE}/conversations/${conv._id}`, {
             method: 'PUT',
@@ -614,6 +678,18 @@ const debouncedSave = debounce(saveConversationToServer, 900);
 window.deleteConversation = async function(id, event) {
     event.stopPropagation();
     if (!confirm('Supprimer cette conversation ?')) return;
+
+    const local = conversations.find(c => c._id === id && c._localDraft);
+    if (local) {
+        conversations = conversations.filter(c => c._id !== id);
+        if (currentConversationId === id) {
+            if (conversations.length === 0) createNewConversation();
+            else loadConversation(conversations[0]._id);
+        }
+        renderConversationsList();
+        return;
+    }
+
     try {
         await fetch(`${API_BASE}/conversations/${id}`, { method: 'DELETE', headers: authHeaders() });
         conversations = conversations.filter(c => c._id !== id);
@@ -781,9 +857,10 @@ window.togglePinConversation = async function(id, event) {
 function renderConversationsList() {
     if (!conversationsList) return;
     conversationsList.innerHTML = '';
+    const savedConversations = conversations.filter(c => !c._localDraft);
     let filtered = searchQuery
-        ? conversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        : [...conversations];
+        ? savedConversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        : [...savedConversations];
     filtered.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
     if (filtered.length === 0 && searchQuery) {
         conversationsList.innerHTML = '<p style="color:rgba(255,255,255,0.35);font-size:0.78rem;text-align:center;padding:16px 0">Aucun resultat</p>';
@@ -1300,6 +1377,14 @@ async function handleMessage() {
 
     sendButton.disabled = true;
     userInput.disabled  = true;
+
+    const persistedConv = await ensureCurrentConversationPersisted();
+    if (!persistedConv) {
+        sendButton.disabled = false;
+        userInput.disabled = false;
+        userInput.focus();
+        return;
+    }
 
     const displayMessage = message || '[Fichier(s) envoye(s)]';
     await addMessage('user-message', displayMessage, false, false);
