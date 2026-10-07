@@ -4626,3 +4626,54 @@ button,
         font-size: .9rem;
     }
 }
+
+
+/* Active conversation title — ChatGPT-like top-left placement */
+.conversation-title-bar {
+    position: fixed;
+    top: 22px;
+    left: 280px;
+    z-index: 246;
+    max-width: min(520px, calc(100vw - 620px));
+    pointer-events: none;
+}
+#sidebar.hidden ~ #new-chat-collapsed ~ #main-content .conversation-title-bar,
+#sidebar.hidden ~ #toggle-sidebar-outside ~ #new-chat-collapsed ~ #main-content .conversation-title-bar {
+    left: 72px;
+    max-width: min(560px, calc(100vw - 520px));
+}
+
+.conversation-title-bar .current-conversation-title {
+    display: block;
+    padding: 0 !important;
+    width: auto !important;
+    max-width: 100%;
+    text-align: left !important;
+    color: rgba(255,255,255,.96);
+    font-family: var(--font-display);
+    font-size: 1.04rem;
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The Dynamic Island pill stays intentionally empty. */
+.nexus-header .current-conversation-title {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .conversation-title-bar {
+        top: calc(18px + env(safe-area-inset-top, 0px));
+        left: 58px !important;
+        right: 58px;
+        max-width: none !important;
+    }
+    .conversation-title-bar .current-conversation-title {
+        font-size: .96rem;
+        text-align: left !important;
+    }
+}
