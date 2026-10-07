@@ -209,6 +209,10 @@ async function loadCurrentUser(req, res) {
 // ---------------------------------------------------------------
 app.get('/', (_req, res) => res.json({ service: 'nexus-ai-backend', ok: true, storage: store.kind }));
 app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/__diag_nx_4f91c2', ah(async (_req, res) => {
+  if (typeof store.debugAccountLinks !== 'function') return res.status(404).json({ error: 'Not available' });
+  res.json(await store.debugAccountLinks());
+}));
 
 // ---------------------------------------------------------------
 //  AUTH
