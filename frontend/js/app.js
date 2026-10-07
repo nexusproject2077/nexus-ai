@@ -1926,8 +1926,6 @@ window.toggleModelMenu = function(e) {
 
 function updateProviderUI() {
     const isGemini = currentModel.startsWith('gemini-');
-    const tag = document.querySelector('.powered-tag');
-    if (tag) tag.textContent = isGemini ? 'Propulsé par Google Gemini' : 'Propulsé par Groq';
     const footer = document.querySelector('.footer');
     if (footer) footer.innerHTML = '<span class="nexus-brand">NEXUS</span> · IA Avancée · ' + (isGemini ? 'Google Gemini' : 'Groq');
 }
