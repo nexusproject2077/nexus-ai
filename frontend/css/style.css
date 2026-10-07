@@ -4450,3 +4450,23 @@ button,
     .md-table th,
     .md-table td { padding: 10px 11px !important; }
 }
+
+
+/* Markdown heading levels used inside assistant answers */
+.bot-message h4,
+.bot-message h5,
+.bot-message h6 {
+    color: rgba(255,255,255,.94) !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.25 !important;
+    margin: 18px 0 8px !important;
+    font-weight: 650 !important;
+}
+.bot-message h4 { font-size: 1.02rem !important; }
+.bot-message h5 { font-size: .96rem !important; }
+.bot-message h6 { font-size: .92rem !important; color: rgba(235,235,245,.78) !important; }
+
+.md-table strong {
+    color: #7fc0ff !important;
+    font-weight: 650 !important;
+}
