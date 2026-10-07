@@ -185,10 +185,19 @@ async function auth(req, res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Non authentifié.' });
   try {
-    // Trust the signed Nexus JWT for routine requests. This avoids one
-    // Firestore read on every /chat and /conversations call.
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { id: payload.id, email: payload.email };
+
+    // MongoDB migration compatibility: old Firestore/Firebase sessions can
+    // contain a different user id for the same email. Resolve the canonical
+    // Mongo account by email so those sessions immediately recover the
+    // existing Mongo conversations and settings.
+    if (store.kind === 'mongodb' && payload.email) {
+      const canonical = await store.usersGetByEmail(payload.email);
+      req.user = canonical || { id: payload.id, email: payload.email };
+    } else {
+      req.user = { id: payload.id, email: payload.email };
+    }
+
     next();
   } catch {
     return res.status(401).json({ error: 'Session expirée.' });
@@ -209,10 +218,6 @@ async function loadCurrentUser(req, res) {
 // ---------------------------------------------------------------
 app.get('/', (_req, res) => res.json({ service: 'nexus-ai-backend', ok: true, storage: store.kind }));
 app.get('/health', (_req, res) => res.json({ ok: true }));
-app.get('/__diag_nx_4f91c2', ah(async (_req, res) => {
-  if (typeof store.debugAccountLinks !== 'function') return res.status(404).json({ error: 'Not available' });
-  res.json(await store.debugAccountLinks());
-}));
 
 // ---------------------------------------------------------------
 //  AUTH
