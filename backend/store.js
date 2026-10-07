@@ -164,6 +164,23 @@ async function createMongoStore(uri, dbName) {
       return cleanUser(await usersCol.findOne({ email }));
     },
 
+    async debugConversationState(userId) {
+      const userIds = [userId];
+      if (ObjectId.isValid(userId)) userIds.push(new ObjectId(userId));
+      const docs = await convsCol.find({ userId: { $in: userIds } }).sort({ updatedAt: -1, createdAt: -1 }).toArray();
+      return docs.map(c => ({
+        id: String(c._id),
+        userId: c.userId != null ? String(c.userId) : null,
+        userIdType: c.userId?.constructor?.name || typeof c.userId,
+        title: c.title || null,
+        messageCount: Array.isArray(c.messages) ? c.messages.length : null,
+        historyCount: Array.isArray(c.history) ? c.history.length : null,
+        keys: Object.keys(c),
+        createdAt: c.createdAt || null,
+        updatedAt: c.updatedAt || null,
+      }));
+    },
+
     async usersGetById(id) {
       return cleanUser(await usersCol.findOne({ $or: [{ id }, ...(ObjectId.isValid(id) ? [{ _id: new ObjectId(id) }] : [])] }));
     },
