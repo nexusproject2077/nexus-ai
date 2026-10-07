@@ -748,6 +748,8 @@ if (newChatBtn) newChatBtn.addEventListener('click', createNewConversation);
 // ===== MARKDOWN =====
 function markdownToHTML(text) {
     const codeBlocks = [];
+    const tableBlocks = [];
+
     text = String(text || '').replace(/```(\w+)?\n?([\s\S]+?)```/g, (_, lang, code) => {
         const token = `@@NEXUS_CODE_${codeBlocks.length}@@`;
         const langAttr = lang ? ` class="language-${lang}"` : '';
@@ -755,24 +757,59 @@ function markdownToHTML(text) {
         return token;
     });
 
-    // Markdown tables -> responsive native HTML tables.
-    text = text.replace(/(^|\n)((?:\|.*\|\s*\n)+\|?\s*:?-{3,}[^\n]*\|\s*(?:\n\|.*\|\s*)+)/g, (match, prefix, block) => {
-        const lines = block.trim().split('\n').map(line => line.trim()).filter(Boolean);
-        if (lines.length < 3) return match;
-        const splitRow = line => line.replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
-        const headers = splitRow(lines[0]);
-        const separator = splitRow(lines[1]);
-        if (!separator.every(cell => /^:?-{3,}:?$/.test(cell))) return match;
-        const rows = lines.slice(2).map(splitRow);
-        const head = '<thead><tr>' + headers.map(cell => '<th>' + cell + '</th>').join('') + '</tr></thead>';
-        const body = '<tbody>' + rows.map(row => '<tr>' + headers.map((_, i) => '<td>' + (row[i] || '') + '</td>').join('') + '</tr>').join('') + '</tbody>';
-        return prefix + '<div class="md-table-wrap"><table class="md-table">' + head + body + '</table></div>';
-    });
+    // Robust line-by-line Markdown table detection.
+    const lines = text.split('\n');
+    const out = [];
+    const splitRow = line => line.trim().replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
+    const isSeparatorRow = line => {
+        const cells = splitRow(line);
+        return cells.length > 0 && cells.every(cell => /^:?-{3,}:?$/.test(cell));
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const headerLine = lines[i];
+        const separatorLine = lines[i + 1];
+
+        if (headerLine?.includes('|') && separatorLine?.includes('|') && isSeparatorRow(separatorLine)) {
+            const headers = splitRow(headerLine);
+            const rows = [];
+            i += 2;
+
+            while (i < lines.length) {
+                const candidate = lines[i].trim();
+                if (!candidate) {
+                    // Allow an occasional blank line inside generated tables.
+                    if (lines[i + 1]?.includes('|')) { i++; continue; }
+                    break;
+                }
+                if (!candidate.includes('|') || /^---+$/.test(candidate)) break;
+                const row = splitRow(candidate);
+                if (row.length < 2) break;
+                rows.push(row);
+                i++;
+            }
+            i--;
+
+            if (headers.length >= 2 && rows.length) {
+                const head = '<thead><tr>' + headers.map(cell => '<th>' + cell + '</th>').join('') + '</tr></thead>';
+                const body = '<tbody>' + rows.map(row =>
+                    '<tr>' + headers.map((_, col) => '<td>' + (row[col] || '') + '</td>').join('') + '</tr>'
+                ).join('') + '</tbody>';
+                const token = `@@NEXUS_TABLE_${tableBlocks.length}@@`;
+                tableBlocks.push('<div class="md-table-wrap"><table class="md-table">' + head + body + '</table></div>');
+                out.push(token);
+                continue;
+            }
+        }
+
+        out.push(headerLine);
+    }
+    text = out.join('\n');
 
     // Block separators.
     text = text.replace(/^\s*---+\s*$/gm, '<hr>');
 
-    // Inline markdown.
+    // Inline Markdown.
     text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
     text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
@@ -786,20 +823,26 @@ function markdownToHTML(text) {
     text = text.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>');
     text = text.replace(/(?:^|\n)((?:<li>[\s\S]*?<\/li>\s*)+)/g, (_, items) => '\n<ul>' + items + '</ul>');
     text = text.replace(/^\s*\d+[.)]\s+(.+)$/gm, '<oli>$1</oli>');
-    text = text.replace(/(?:^|\n)((?:<oli>[\s\S]*?<\/oli>\s*)+)/g, (_, items) => '\n<ol>' + items.replace(/<\/?oli>/g, m => m.startsWith('</') ? '</li>' : '<li>') + '</ol>');
+    text = text.replace(/(?:^|\n)((?:<oli>[\s\S]*?<\/oli>\s*)+)/g, (_, items) =>
+        '\n<ol>' + items.replace(/<\/?oli>/g, m => m.startsWith('</') ? '</li>' : '<li>') + '</ol>'
+    );
 
-    // Preserve readable single line breaks without breaking block elements.
+    // Paragraphs / line breaks while preserving structural placeholders.
     const blocks = text.split(/\n{2,}/).map(chunk => chunk.trim()).filter(Boolean);
     text = blocks.map(chunk => {
-        if (/^(<h[1-3]|<ul>|<ol>|<blockquote>|<hr>|<div class="md-table-wrap"|@@NEXUS_CODE_)/.test(chunk)) {
+        if (/^(<h[1-3]|<ul>|<ol>|<blockquote>|<hr>|@@NEXUS_TABLE_|@@NEXUS_CODE_)/.test(chunk)) {
             return chunk.replace(/\n/g, '');
         }
         return '<p>' + chunk.replace(/\n/g, '<br>') + '</p>';
     }).join('');
 
+    tableBlocks.forEach((html, i) => {
+        text = text.replace(`@@NEXUS_TABLE_${i}@@`, html);
+    });
     codeBlocks.forEach((html, i) => {
         text = text.replace(`@@NEXUS_CODE_${i}@@`, html);
     });
+
     return text;
 }
 // ===== TYPEWRITER =====
