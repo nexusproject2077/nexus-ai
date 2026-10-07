@@ -698,6 +698,58 @@ window.toggleConversationMenu = function(id, event) {
     if (menu && wasHidden) menu.classList.remove('hidden');
 };
 
+function beginConversationTitleEdit() {
+    const conv = getCurrentConversation();
+    const bar = document.getElementById('conversation-title-bar');
+    const titleEl = document.getElementById('current-conversation-title');
+    if (!conv || !bar || !titleEl || bar.classList.contains('editing')) return;
+
+    const original = conv.title || 'Nouvelle conversation';
+    bar.classList.add('editing');
+    bar.innerHTML = '<input id="conversation-title-input" class="conversation-title-input" type="text" maxlength="100" aria-label="Titre de la conversation">';
+
+    const input = document.getElementById('conversation-title-input');
+    input.value = original;
+    input.focus();
+    input.select();
+
+    let finished = false;
+    const finish = async (save) => {
+        if (finished) return;
+        finished = true;
+
+        const value = (input.value || '').trim();
+        const nextTitle = save && value ? value.slice(0, 100) : original;
+
+        if (save && nextTitle !== original) {
+            conv.title = nextTitle;
+            renderConversationsList();
+            await saveConversationToServer(conv);
+        }
+
+        bar.classList.remove('editing');
+        bar.innerHTML = '<span id="current-conversation-title" class="current-conversation-title"></span><svg class="conversation-title-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
+        const restored = document.getElementById('current-conversation-title');
+        if (restored) restored.textContent = conv.title || original;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            finish(true);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            finish(false);
+        }
+    });
+    input.addEventListener('blur', () => finish(true));
+}
+
+const conversationTitleBar = document.getElementById('conversation-title-bar');
+if (conversationTitleBar) {
+    conversationTitleBar.addEventListener('click', () => beginConversationTitleEdit());
+}
+
 window.renameConversation = async function(id, event) {
     event?.stopPropagation();
     closeConversationMenus();
