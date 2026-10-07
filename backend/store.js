@@ -178,17 +178,24 @@ async function createMongoStore(uri, dbName) {
     },
 
     async usersSave(user) {
+      const filter = ObjectId.isValid(user.id)
+        ? { $or: [{ id: user.id }, { _id: new ObjectId(user.id) }] }
+        : { id: user.id };
+
       await usersCol.updateOne(
-        { id: user.id },
-        { $set: { ...user } },
+        filter,
+        { $set: { ...user, id: user.id } },
         { upsert: true }
       );
       return user;
     },
 
     async convsListByUser(userId) {
+      const userIds = [userId];
+      if (ObjectId.isValid(userId)) userIds.push(new ObjectId(userId));
+
       return (await convsCol
-        .find({ userId })
+        .find({ userId: { $in: userIds } })
         .sort({ updatedAt: -1, createdAt: -1 })
         .toArray())
         .map(cleanConv);
