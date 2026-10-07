@@ -139,9 +139,12 @@ function initChatPage() {
         if (savedSidebar === 'hidden') sidebar.classList.add('hidden');
     }
 
-    loadConversationsFromServer();
-    startConversationSync();
-    loadSettingsFromServer();
+    loadSettingsFromServer().finally(() => {
+        // Fallback refresh after bootstrap; Mongo bootstrap already restores the
+        // sidebar even if this second request is skipped or fails.
+        loadConversationsFromServer();
+        startConversationSync();
+    });
     initModelSelector();
     maybePromptPhone();
 }
@@ -1533,6 +1536,23 @@ async function loadSettingsFromServer() {
         const data = await res.json();
         _settingsCache = data.settings || {};
         _userMemory = data.memory || [];
+
+        // /user/settings is the startup bootstrap source of truth. Restore
+        // conversations from it so refresh/login cannot leave the sidebar empty.
+        if (Array.isArray(data.conversations)) {
+            const remote = normalizeConversationList(data.conversations);
+            const localDraft = conversations.find(c => c._localDraft);
+            conversations = localDraft ? [localDraft, ...remote] : remote;
+            lastSyncFingerprint = conversationFingerprint(remote);
+            renderConversationsList();
+
+            if (!localDraft && remote.length && !remote.some(c => c._id === currentConversationId)) {
+                await loadConversation(remote[0]._id);
+            } else if (!localDraft && !remote.length && !conversations.length) {
+                createNewConversation();
+            }
+        }
+
         if (data.sidebarState === 'hidden') sidebar.classList.add('hidden');
         else if (window.innerWidth > 768) sidebar.classList.remove('hidden');
         const s = loadSettings();
