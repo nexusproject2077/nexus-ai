@@ -274,7 +274,10 @@ app.post('/auth/firebase', ah(async (req, res) => {
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
     const email = decoded.email || `${decoded.uid}@firebase.local`;
-    let user = await store.usersGetByEmail(email);
+    let user = typeof store.usersResolveSocialDuplicates === 'function'
+      ? await store.usersResolveSocialDuplicates(email, decoded.uid)
+      : await store.usersGetByEmail(email);
+
     if (!user) {
       user = {
         id: decoded.uid,
