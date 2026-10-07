@@ -455,10 +455,17 @@ app.post('/chat', auth, ah(async (req, res) => {
 app.get('/user/settings', auth, ah(async (req, res) => {
   const user = await loadCurrentUser(req, res);
   if (!user) return;
+
+  // Bootstrap conversations together with settings. The frontend always loads
+  // this endpoint at startup, so Mongo conversations are recovered even if a
+  // standalone /conversations request is skipped/cached by the browser.
+  const conversations = await store.convsListByUser(user.id);
+
   res.json({
     settings: user.settings || {},
     memory: user.memory || [],
     sidebarState: user.sidebarState || 'visible',
+    conversations,
   });
 }));
 
