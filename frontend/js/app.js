@@ -631,6 +631,8 @@ async function loadConversation(id) {
     currentConversationId = id;
     const conv = conversations.find(c => c._id === id);
     if (!conv) return;
+    const titleEl = document.getElementById('current-conversation-title');
+    if (titleEl) titleEl.textContent = conv.title || 'Nouvelle conversation';
 
     // Avoid briefly showing the beginning of a long conversation while it is restored.
     chatBox.style.visibility = 'hidden';
@@ -677,6 +679,8 @@ function updateConversationTitle(message) {
     const conv = getCurrentConversation();
     if (conv && conv.messages.length === 1) {
         conv.title = message.substring(0, 30) + (message.length > 30 ? '...' : '');
+        const titleEl = document.getElementById('current-conversation-title');
+        if (titleEl) titleEl.textContent = conv.title;
         renderConversationsList();
         saveConversationToServer(conv);
     }
@@ -704,6 +708,10 @@ window.renameConversation = async function(id, event) {
     const clean = title.trim();
     if (!clean) return;
     conv.title = clean.slice(0, 100);
+    if (currentConversationId === id) {
+        const titleEl = document.getElementById('current-conversation-title');
+        if (titleEl) titleEl.textContent = conv.title;
+    }
     renderConversationsList();
     await saveConversationToServer(conv);
 };
