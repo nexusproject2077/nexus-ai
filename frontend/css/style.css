@@ -4342,3 +4342,9 @@ button,
         border-radius: 999px !important;
     }
 }
+
+
+/* Fine-tune Nexus AI vertical centering inside Dynamic Island pill */
+.nexus-header-inner h1 {
+    transform: translateY(2px) !important;
+}
