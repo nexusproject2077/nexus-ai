@@ -645,9 +645,33 @@ async function loadConversation(id) {
     renderConversationsList();
 
     const revealAtBottom = () => {
+        // The conversation can scroll through the page itself on desktop,
+        // while chatBox may also be scrollable depending on the viewport.
         chatBox.scrollTop = chatBox.scrollHeight;
+
+        const scroller = document.scrollingElement || document.documentElement;
+        const bottom = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight,
+            scroller.scrollHeight
+        );
+        scroller.scrollTop = bottom;
+        window.scrollTo({ top: bottom, left: 0, behavior: 'auto' });
+
+        // Keep the final answer just above the fixed composer instead of
+        // stopping part-way through a long message.
         const lastMessage = chatBox.lastElementChild;
-        if (lastMessage) lastMessage.scrollIntoView({ block: 'end', behavior: 'auto' });
+        if (lastMessage) {
+            lastMessage.scrollIntoView({ block: 'end', behavior: 'auto' });
+            const finalBottom = Math.max(
+                document.body.scrollHeight,
+                document.documentElement.scrollHeight,
+                scroller.scrollHeight
+            );
+            scroller.scrollTop = finalBottom;
+            window.scrollTo({ top: finalBottom, left: 0, behavior: 'auto' });
+        }
+
         chatBox.style.visibility = 'visible';
     };
 
