@@ -520,8 +520,13 @@ function conversationFingerprint(list) {
     return JSON.stringify((list || []).map(c => [c._id, c.title, c.updatedAt || c.createdAt, (c.messages || []).length]));
 }
 
-async function syncConversationsFromServer() {
+let lastConversationSyncAt = 0;
+
+async function syncConversationsFromServer(force = false) {
     if (!getToken() || document.hidden || isTyping) return;
+    const now = Date.now();
+    if (!force && now - lastConversationSyncAt < 15000) return;
+    lastConversationSyncAt = now;
     try {
         const res = await fetch(`${API_BASE}/conversations`, { headers: authHeaders(), cache: 'no-store' });
         if (!res.ok) return;
@@ -556,7 +561,9 @@ async function syncConversationsFromServer() {
 
 function startConversationSync() {
     stopConversationSync();
-    syncTimer = setInterval(syncConversationsFromServer, 3000);
+    // Firestore free tier protection: no aggressive polling.
+    // Device switching still syncs immediately on focus/visibility.
+    syncTimer = setInterval(syncConversationsFromServer, 60000);
 }
 
 function stopConversationSync() {
@@ -565,11 +572,11 @@ function stopConversationSync() {
 }
 
 document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && getToken()) syncConversationsFromServer();
+    if (!document.hidden && getToken()) syncConversationsFromServer(true);
 });
 
 window.addEventListener('focus', () => {
-    if (getToken()) syncConversationsFromServer();
+    if (getToken()) syncConversationsFromServer(true);
 });
 
 // ===== API CONVERSATIONS =====
