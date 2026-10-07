@@ -185,14 +185,23 @@ async function auth(req, res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Non authentifié.' });
   try {
+    // Trust the signed Nexus JWT for routine requests. This avoids one
+    // Firestore read on every /chat and /conversations call.
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = await store.usersGetById(payload.id);
-    if (!user) return res.status(401).json({ error: 'Session invalide.' });
-    req.user = user;
+    req.user = { id: payload.id, email: payload.email };
     next();
   } catch {
     return res.status(401).json({ error: 'Session expirée.' });
   }
+}
+
+async function loadCurrentUser(req, res) {
+  const user = await store.usersGetById(req.user.id);
+  if (!user) {
+    res.status(401).json({ error: 'Session invalide.' });
+    return null;
+  }
+  return user;
 }
 
 // ---------------------------------------------------------------
@@ -431,50 +440,60 @@ app.post('/chat', auth, ah(async (req, res) => {
 // ---------------------------------------------------------------
 //  USER SETTINGS + PHONE + MEMORY
 // ---------------------------------------------------------------
-app.get('/user/settings', auth, ah((req, res) => {
+app.get('/user/settings', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
   res.json({
-    settings: req.user.settings || {},
-    memory: req.user.memory || [],
-    sidebarState: req.user.sidebarState || 'visible',
+    settings: user.settings || {},
+    memory: user.memory || [],
+    sidebarState: user.sidebarState || 'visible',
   });
 }));
 
 app.put('/user/settings', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
   const { settings, sidebarState } = req.body || {};
-  if (settings !== undefined) req.user.settings = settings;
-  if (sidebarState !== undefined) req.user.sidebarState = sidebarState;
-  await store.usersSave(req.user);
+  if (settings !== undefined) user.settings = settings;
+  if (sidebarState !== undefined) user.sidebarState = sidebarState;
+  await store.usersSave(user);
   res.json({ ok: true });
 }));
 
 // Update the user's phone number (from the login prompt or Settings).
 app.put('/user/phone', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
   const { phone } = req.body || {};
   if (phone === '' || phone === null) {
-    req.user.phone = '';
+    user.phone = '';
   } else {
     const p = normalizePhone(phone);
     if (!p) return res.status(400).json({ error: 'Numéro de téléphone invalide.' });
-    req.user.phone = p;
+    user.phone = p;
   }
-  await store.usersSave(req.user);
-  res.json({ ok: true, user: publicUser(req.user) });
+  await store.usersSave(user);
+  res.json({ ok: true, user: publicUser(user) });
 }));
 
 app.put('/user/memory', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
   const { memory } = req.body || {};
-  if (Array.isArray(memory)) req.user.memory = memory;
-  await store.usersSave(req.user);
-  res.json({ ok: true, memory: req.user.memory });
+  if (Array.isArray(memory)) user.memory = memory;
+  await store.usersSave(user);
+  res.json({ ok: true, memory: user.memory });
 }));
 
 app.delete('/user/memory/:index', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
   const i = parseInt(req.params.index, 10);
-  if (Number.isInteger(i) && i >= 0 && i < (req.user.memory || []).length) {
-    req.user.memory.splice(i, 1);
-    await store.usersSave(req.user);
+  if (Number.isInteger(i) && i >= 0 && i < (user.memory || []).length) {
+    user.memory.splice(i, 1);
+    await store.usersSave(user);
   }
-  res.json({ ok: true, memory: req.user.memory });
+  res.json({ ok: true, memory: user.memory });
 }));
 
 // Central error handler — turns any thrown/rejected route error into a
