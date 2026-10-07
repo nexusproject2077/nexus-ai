@@ -580,33 +580,13 @@ window.addEventListener('focus', () => {
 });
 
 // ===== API CONVERSATIONS =====
-async function cleanupLegacyEmptyConversations(list) {
-    const emptyLegacy = (list || []).filter(conv =>
-        !conv._localDraft &&
-        (!Array.isArray(conv.messages) || conv.messages.length === 0) &&
-        (conv.title === 'Nouvelle conversation' || !String(conv.title || '').trim())
-    );
-
-    if (!emptyLegacy.length) return list || [];
-
-    await Promise.allSettled(emptyLegacy.map(conv =>
-        fetch(`${API_BASE}/conversations/${conv._id}`, {
-            method: 'DELETE',
-            headers: authHeaders()
-        })
-    ));
-
-    const emptyIds = new Set(emptyLegacy.map(conv => conv._id));
-    return (list || []).filter(conv => !emptyIds.has(conv._id));
-}
-
 async function loadConversationsFromServer() {
     try {
         const res = await fetch(`${API_BASE}/conversations`, { headers: authHeaders() });
         if (res.status === 401) { handleLogout(); return; }
 
         const remote = await res.json();
-        conversations = await cleanupLegacyEmptyConversations(remote);
+        conversations = Array.isArray(remote) ? remote : [];
         lastSyncFingerprint = conversationFingerprint(conversations);
 
         if (conversations.length === 0) createNewConversation();
@@ -667,16 +647,23 @@ async function ensureCurrentConversationPersisted() {
 }
 
 async function saveConversationToServer(conv) {
-    if (!conv || conv._localDraft) return;
+    if (!conv || conv._localDraft) return false;
     try {
-        await fetch(`${API_BASE}/conversations/${conv._id}`, {
+        const res = await fetch(`${API_BASE}/conversations/${conv._id}`, {
             method: 'PUT',
             headers: authHeaders(),
             body: JSON.stringify({ title: conv.title, messages: conv.messages, history: conv.history, pinned: !!conv.pinned })
         });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || `Sauvegarde impossible (${res.status})`);
+        }
         lastSyncFingerprint = '';
+        return true;
     } catch (err) {
         console.error('Erreur sauvegarde:', err);
+        showToast('Conversation non sauvegardée. Nouvelle tentative au prochain envoi.', 'error', 3500);
+        return false;
     }
 }
 
@@ -1396,6 +1383,10 @@ async function handleMessage() {
     const displayMessage = message || '[Fichier(s) envoye(s)]';
     await addMessage('user-message', displayMessage, false, false);
     updateConversationTitle(displayMessage);
+
+    // Persist the first user message immediately before the AI call.
+    await saveConversationToServer(getCurrentConversation());
+
     userInput.value = '';
     userInput.style.height = 'auto';
 
