@@ -218,6 +218,10 @@ async function loadCurrentUser(req, res) {
 // ---------------------------------------------------------------
 app.get('/', (_req, res) => res.json({ service: 'nexus-ai-backend', ok: true, storage: store.kind }));
 app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/__diag_conv_7c11', ah(async (_req, res) => {
+  if (typeof store.debugConversationState !== 'function') return res.status(404).json({ error: 'Not available' });
+  res.json(await store.debugConversationState('6a0e149f02bf4400d66c74c2'));
+}));
 
 // ---------------------------------------------------------------
 //  AUTH
