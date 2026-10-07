@@ -168,6 +168,78 @@ async function createMongoStore(uri, dbName) {
       return cleanUser(await usersCol.findOne({ $or: [{ id }, ...(ObjectId.isValid(id) ? [{ _id: new ObjectId(id) }] : [])] }));
     },
 
+    async usersResolveSocialDuplicates(email, preferredId) {
+      const docs = await usersCol.find({ email }).toArray();
+      if (docs.length <= 1) return cleanUser(docs[0] || null);
+
+      const scored = [];
+      for (const doc of docs) {
+        const clean = cleanUser(doc);
+        const ids = [clean.id, String(doc._id)];
+        const queryIds = [...new Set(ids.flatMap(v => {
+          const out = [v];
+          if (ObjectId.isValid(v)) out.push(new ObjectId(v));
+          return out;
+        }))];
+        const count = await convsCol.countDocuments({ userId: { $in: queryIds } });
+        scored.push({ doc, clean, count });
+      }
+
+      scored.sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        if (a.clean.id === preferredId) return -1;
+        if (b.clean.id === preferredId) return 1;
+        return new Date(a.clean.createdAt || 0) - new Date(b.clean.createdAt || 0);
+      });
+
+      const primary = scored[0];
+      const duplicates = scored.slice(1);
+
+      const mergedMemory = [...new Set(scored.flatMap(x => Array.isArray(x.clean.memory) ? x.clean.memory : []))];
+      const mergedSettings = Object.assign({}, ...scored.map(x => x.clean.settings || {}));
+      const merged = {
+        ...duplicates.reverse().reduce((acc, x) => ({ ...acc, ...x.clean }), {}),
+        ...primary.clean,
+        email,
+        memory: mergedMemory,
+        settings: mergedSettings,
+        phone: primary.clean.phone || scored.find(x => x.clean.phone)?.clean.phone || '',
+        sidebarState: primary.clean.sidebarState || scored.find(x => x.clean.sidebarState)?.clean.sidebarState || 'visible',
+      };
+
+      // Re-link all conversations from duplicate account IDs to the primary account.
+      for (const x of scored) {
+        const rawIds = [x.clean.id, String(x.doc._id)];
+        const queryIds = [...new Set(rawIds.flatMap(v => {
+          const out = [v];
+          if (ObjectId.isValid(v)) out.push(new ObjectId(v));
+          return out;
+        }))];
+        await convsCol.updateMany(
+          { userId: { $in: queryIds } },
+          { $set: { userId: primary.clean.id } }
+        );
+      }
+
+      const primaryFilter = primary.doc._id instanceof ObjectId
+        ? { _id: primary.doc._id }
+        : idFilter(primary.clean.id);
+
+      await usersCol.updateOne(
+        primaryFilter,
+        { $set: { ...merged, id: primary.clean.id } }
+      );
+
+      for (const x of duplicates) {
+        await usersCol.deleteOne({ _id: x.doc._id });
+      }
+
+      // Recreate the unique email index after duplicate cleanup when possible.
+      await usersCol.createIndex({ email: 1 }, { unique: true, sparse: true }).catch(() => {});
+
+      return cleanUser(await usersCol.findOne(primaryFilter));
+    },
+
     async usersCreate(user) {
       await usersCol.updateOne(
         { id: user.id },
