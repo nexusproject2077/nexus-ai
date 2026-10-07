@@ -4601,3 +4601,28 @@ button,
     padding-left: 0 !important;
     margin: 2px 0 18px !important;
 }
+
+
+/* Active conversation title inside the reserved top pill */
+.current-conversation-title {
+    display: block;
+    width: 100%;
+    padding: 0 24px;
+    box-sizing: border-box;
+    text-align: center;
+    color: rgba(255,255,255,.92);
+    font-family: var(--font-display);
+    font-size: .98rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+@media (max-width: 768px) {
+    .current-conversation-title {
+        padding: 0 16px;
+        font-size: .9rem;
+    }
+}
