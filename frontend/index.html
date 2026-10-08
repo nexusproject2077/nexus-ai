@@ -190,7 +190,15 @@
                 <svg class="conversation-title-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
             </div>
             <header class="nexus-header" id="nexus-header">
-                <div class="nexus-header-inner"></div>
+                <div class="nexus-header-inner">
+                    <div class="assistant-mode" id="assistant-mode" role="group" aria-label="Mode de réponse">
+                        <button type="button" class="assistant-mode-btn active" data-assistant-mode="chat" onclick="selectAssistantMode('chat')">Chat</button>
+                        <button type="button" class="assistant-mode-btn" data-assistant-mode="code" onclick="selectAssistantMode('code')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14"/></svg>
+                            Code
+                        </button>
+                    </div>
+                </div>
             </header>
 
             <div class="uploaded-files-container" id="uploaded-files"></div>
@@ -246,13 +254,6 @@
                     <button type="button" class="code-workflow-btn" data-code-task="debug" onclick="selectCodeTask('debug')">Debug</button>
                     <button type="button" class="code-workflow-btn" data-code-task="explain" onclick="selectCodeTask('explain')">Explain</button>
                     <span class="code-workflow-hint" id="code-workflow-hint">Fonctionnalité complète et cohérente</span>
-                </div>
-                <div class="assistant-mode" id="assistant-mode" role="group" aria-label="Mode de réponse">
-                    <button type="button" class="assistant-mode-btn active" data-assistant-mode="chat" onclick="selectAssistantMode('chat')">Chat</button>
-                    <button type="button" class="assistant-mode-btn" data-assistant-mode="code" onclick="selectAssistantMode('code')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14"/></svg>
-                        Code
-                    </button>
                 </div>
             </div>
 
