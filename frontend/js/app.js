@@ -146,7 +146,6 @@ function initChatPage() {
         startConversationSync();
     });
     initModelSelector();
-    maybePromptPhone();
 }
 
 // ===== ELEMENTS DOM =====
@@ -1532,6 +1531,14 @@ async function loadSettingsFromServer() {
         _settingsCache = data.settings || {};
         _userMemory = data.memory || [];
 
+        if (data.user) {
+            const localUser = getUser() || {};
+            const canonicalUser = { ...localUser, ...data.user };
+            localStorage.setItem('nexus_user', JSON.stringify(canonicalUser));
+            const usernameEl = document.getElementById('sidebar-username');
+            if (usernameEl && canonicalUser.username) usernameEl.textContent = `@${canonicalUser.username}`;
+        }
+
         // /user/settings is the startup bootstrap source of truth. Restore
         // conversations from it so refresh/login cannot leave the sidebar empty.
         if (Array.isArray(data.conversations)) {
@@ -1557,6 +1564,7 @@ async function loadSettingsFromServer() {
         else document.documentElement.classList.remove('theme-light');
         if (s.contrast === 'high') document.documentElement.classList.add('contrast-high');
         else document.documentElement.classList.remove('contrast-high');
+        maybePromptPhone();
     } catch (err) {
         console.error('Erreur chargement settings:', err);
     }
