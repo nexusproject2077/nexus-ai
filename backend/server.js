@@ -27,7 +27,7 @@ const app = express();
 app.use(cors({ origin: (origin, callback) => {
   // Keep API usable from local development while allowing credentialed OAuth
   // cookies only for the configured production origin.
-  if (!origin || origin === FRONTEND_ORIGIN || /^http:\/\/localhost(?::\d+)?$/.test(origin)) return callback(null, true);
+  if (!origin || origin === FRONTEND_ORIGIN || origin === 'https://nexus-ai-608af.web.app' || origin === 'https://nexus-ai-608af.firebaseapp.com' || /^http:\/\/localhost(?::\d+)?$/.test(origin)) return callback(null, true);
   callback(new Error('Origine non autorisée.'));
 }, credentials: true }));
 app.use(express.json({ limit: '12mb' })); // messages can carry file text
