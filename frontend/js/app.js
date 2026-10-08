@@ -7,6 +7,11 @@ const TAVILY_KEY = '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';
 
 // ===== ÉTAT MODÈLE (sélecteur Groq) =====
 let currentModel = localStorage.getItem('nexus_model') || NEXUS_CFG.DEFAULT_MODEL || MODELS[0].id;
+const CODE_TASKS = {
+    build: 'Fonctionnalité complète et cohérente',
+    debug: 'Diagnostic, cause racine et correctif',
+    explain: 'Lecture guidée du code et impacts'
+};
 if (!MODELS.some(m => m.id === currentModel)) {
     currentModel = NEXUS_CFG.DEFAULT_MODEL || MODELS[0].id;
     localStorage.setItem('nexus_model', currentModel);
@@ -526,6 +531,8 @@ function normalizeConversation(raw) {
         messages: Array.isArray(raw.messages) ? raw.messages : [],
         history: Array.isArray(raw.history) ? raw.history : [],
         pinned: !!raw.pinned,
+        assistantMode: raw.assistantMode === 'code' ? 'code' : 'chat',
+        codeTask: Object.hasOwn(CODE_TASKS, raw.codeTask) ? raw.codeTask : 'build',
         createdAt: raw.createdAt || raw.updatedAt || new Date().toISOString(),
     };
 }
@@ -646,6 +653,8 @@ function createNewConversation() {
         messages: [],
         history: [],
         pinned: false,
+        assistantMode: 'chat',
+        codeTask: 'build',
         createdAt: new Date().toISOString(),
         _localDraft: true
     };
@@ -663,7 +672,11 @@ async function ensureCurrentConversationPersisted() {
     try {
         const res = await fetch(`${API_BASE}/conversations`, {
             method: 'POST',
-            headers: authHeaders()
+            headers: authHeaders(),
+            body: JSON.stringify({
+                assistantMode: draft.assistantMode,
+                codeTask: draft.codeTask
+            })
         });
         if (!res.ok) throw new Error('Creation conversation impossible.');
 
@@ -688,7 +701,7 @@ async function saveConversationToServer(conv) {
         const res = await fetch(`${API_BASE}/conversations/${conv._id}`, {
             method: 'PUT',
             headers: authHeaders(),
-            body: JSON.stringify({ title: conv.title, messages: conv.messages, history: conv.history, pinned: !!conv.pinned })
+            body: JSON.stringify({ title: conv.title, messages: conv.messages, history: conv.history, pinned: !!conv.pinned, assistantMode: conv.assistantMode, codeTask: conv.codeTask })
         });
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
@@ -739,6 +752,7 @@ async function loadConversation(id) {
     if (!conv) return;
     const titleEl = document.getElementById('current-conversation-title');
     if (titleEl) titleEl.textContent = conv.title || 'Nouvelle conversation';
+    refreshAssistantModeUI(conv);
 
     // Avoid briefly showing the beginning of a long conversation while it is restored.
     chatBox.style.visibility = 'hidden';
@@ -968,10 +982,13 @@ function markdownToHTML(text) {
         .replace(/\*([^*]+)\*/g, '<em>$1</em>')
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 
-    text = String(text || '').replace(/```(\w+)?\n?([\s\S]+?)```/g, (_, lang, code) => {
+    text = String(text || '').replace(/```([^\n`]*)\n?([\s\S]+?)```/g, (_, rawLang, code) => {
         const token = `@@NEXUS_CODE_${codeBlocks.length}@@`;
+        const lang = String(rawLang || '').trim().toLowerCase().replace(/[^a-z0-9_+#.-]/g, '');
+        const label = lang || 'text';
         const langAttr = lang ? ` class="language-${lang}"` : '';
-        codeBlocks.push(`<div class="code-block-wrapper"><pre><code${langAttr}>${code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre><button class="copy-code-btn" onclick="copyCode(this)">Copier</button></div>`);
+        const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        codeBlocks.push(`<section class="code-block-wrapper"><div class="code-block-toolbar"><span class="code-language">${label}</span><button class="copy-code-btn" type="button" onclick="copyCode(this)" aria-label="Copier le code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copier</span></button></div><pre><code${langAttr}>${escaped}</code></pre></section>`);
         return token;
     });
 
@@ -1228,6 +1245,11 @@ function buildSystemPrompt() {
     if (s.instructions) prompt += '\n\nInstructions personnalisees : ' + s.instructions;
     if (s.webSearch) prompt += '\n\nDes résultats de recherche web peuvent être fournis avant ta question. Utilise-les pour donner des réponses précises et à jour. Cite toujours les sources avec leur URL.';
     prompt += "\n\nIMPORTANT: Tu PEUX analyser tous les fichiers. Tu peux utiliser le formatage Markdown.";
+    const conv = getCurrentConversation();
+    if (conv?.assistantMode === 'code') {
+        const task = conv.codeTask || 'build';
+        prompt += `\n\nMode Code actif (${task}). Réponds comme un ingénieur logiciel : privilégie du code exécutable, des changements minimaux et compatibles avec l'architecture fournie. Pour plusieurs fichiers, annonce chaque chemin avec un titre Markdown puis fournis les contenus ou diffs complets. Vérifie les imports, contrats d'API, variables d'environnement, erreurs de syntaxe et effets de bord avant de conclure.`;
+    }
     prompt += buildMemoryContext();
     return prompt;
 }
@@ -1361,6 +1383,7 @@ async function getGroqAIResponse(message, searchContext = null) {
             signal: currentFetch.signal,
             body: JSON.stringify({
                 model: currentModel,
+                mode: { assistantMode: conv.assistantMode || 'chat', codeTask: conv.codeTask || 'build' },
                 messages: [
                     { role: 'system', content: buildSystemPrompt() },
                     ...conv.history
@@ -1953,10 +1976,52 @@ window.copyCode = function(btn) {
     const code = btn.closest('.code-block-wrapper')?.querySelector('code');
     if (!code) return;
     navigator.clipboard.writeText(code.textContent).then(() => {
-        btn.textContent = 'Copie !';
+        const label = btn.querySelector('span');
+        if (label) label.textContent = 'Copié';
         btn.classList.add('copied');
-        setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 1800);
+        setTimeout(() => { if (label) label.textContent = 'Copier'; btn.classList.remove('copied'); }, 1800);
     }).catch(() => {});
+};
+
+// ===== MODE CHAT / CODE =====
+function getModeConversation() { return getCurrentConversation(); }
+
+function refreshAssistantModeUI(conv = getModeConversation()) {
+    const mode = conv?.assistantMode === 'code' ? 'code' : 'chat';
+    const task = Object.hasOwn(CODE_TASKS, conv?.codeTask) ? conv.codeTask : 'build';
+    document.querySelectorAll('[data-assistant-mode]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.assistantMode === mode);
+        btn.setAttribute('aria-pressed', String(btn.dataset.assistantMode === mode));
+    });
+    document.querySelectorAll('[data-code-task]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.codeTask === task);
+        btn.setAttribute('aria-pressed', String(btn.dataset.codeTask === task));
+    });
+    const workflow = document.getElementById('code-workflow');
+    if (workflow) workflow.classList.toggle('hidden', mode !== 'code');
+    const hint = document.getElementById('code-workflow-hint');
+    if (hint) hint.textContent = CODE_TASKS[task];
+    if (userInput) userInput.placeholder = mode === 'code'
+        ? 'Décris le code, les fichiers ou l’erreur à traiter…'
+        : 'Écris quelque chose…';
+}
+
+window.selectAssistantMode = function(mode) {
+    const conv = getModeConversation();
+    if (!conv || !['chat', 'code'].includes(mode)) return;
+    conv.assistantMode = mode;
+    if (!conv.codeTask) conv.codeTask = 'build';
+    refreshAssistantModeUI(conv);
+    if (!conv._localDraft) debouncedSave(conv);
+};
+
+window.selectCodeTask = function(task) {
+    const conv = getModeConversation();
+    if (!conv || !Object.hasOwn(CODE_TASKS, task)) return;
+    conv.assistantMode = 'code';
+    conv.codeTask = task;
+    refreshAssistantModeUI(conv);
+    if (!conv._localDraft) debouncedSave(conv);
 };
 
 // ===== SELECTEUR DE MODELE (Groq) =====

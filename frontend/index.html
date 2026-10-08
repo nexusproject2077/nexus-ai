@@ -225,6 +225,14 @@
                         <div class="model-menu hidden" id="model-menu"></div>
                     </div>
 
+                    <div class="assistant-mode" id="assistant-mode" role="group" aria-label="Mode de réponse">
+                        <button type="button" class="assistant-mode-btn active" data-assistant-mode="chat" onclick="selectAssistantMode('chat')">Chat</button>
+                        <button type="button" class="assistant-mode-btn" data-assistant-mode="code" onclick="selectAssistantMode('code')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14"/></svg>
+                            Code
+                        </button>
+                    </div>
+
                     <div class="composer-actions-right">
                         <div id="speed-meter" class="speed-meter hidden" title="Vitesse de génération">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
@@ -240,6 +248,12 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
                         </button>
                     </div>
+                </div>
+                <div class="code-workflow hidden" id="code-workflow" aria-label="Approche de développement">
+                    <button type="button" class="code-workflow-btn active" data-code-task="build" onclick="selectCodeTask('build')">Build</button>
+                    <button type="button" class="code-workflow-btn" data-code-task="debug" onclick="selectCodeTask('debug')">Debug</button>
+                    <button type="button" class="code-workflow-btn" data-code-task="explain" onclick="selectCodeTask('explain')">Explain</button>
+                    <span class="code-workflow-hint" id="code-workflow-hint">Fonctionnalité complète et cohérente</span>
                 </div>
             </div>
 

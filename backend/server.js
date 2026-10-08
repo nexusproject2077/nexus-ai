@@ -49,6 +49,17 @@ const PROVIDERS = {
   gemini: { url: GEMINI_URL, key: () => GEMINI_API_KEY, label: 'GEMINI_API_KEY' },
 };
 
+const CODE_SYSTEM_PROMPTS = {
+  build: `You are Nexus AI in Code Build mode. Produce production-ready, executable changes that fit the supplied architecture. When work spans files, use a Markdown heading containing the exact path for every file, explain the integration briefly, and provide complete changed functions or focused unified diffs. Preserve existing contracts unless migration is explicitly requested. Check imports, types, API shapes, configuration and error paths before answering.`,
+  debug: `You are Nexus AI in Code Debug mode. Read logs and code carefully, identify the most likely root cause with evidence, then provide the smallest safe repair. When files are involved, name exact paths and include executable patches or replacement functions. Do not invent successful test results; state concise verification commands and expected outcomes.`,
+  explain: `You are Nexus AI in Code Explain mode. Explain code accurately from the supplied context, including data flow, dependencies, risks and side effects. If a change is requested, provide minimal executable edits organized by exact file path. Keep technical terminology precise and distinguish evidence from assumptions.`
+};
+
+function codeSystemPrompt(mode) {
+  if (!mode || mode.assistantMode !== 'code') return null;
+  return CODE_SYSTEM_PROMPTS[mode.codeTask] || CODE_SYSTEM_PROMPTS.build;
+}
+
 // Persistence backend (Firestore or in-memory) — see store.js.
 const store = await getStore();
 
@@ -322,6 +333,7 @@ app.get('/conversations', auth, ah(async (req, res) => {
 }));
 
 app.post('/conversations', auth, ah(async (req, res) => {
+  const { assistantMode, codeTask } = req.body || {};
   const conv = {
     _id: randomUUID(),
     userId: req.user.id,
@@ -329,6 +341,8 @@ app.post('/conversations', auth, ah(async (req, res) => {
     messages: [],
     history: [],
     pinned: false,
+    assistantMode: assistantMode === 'code' ? 'code' : 'chat',
+    codeTask: ['build', 'debug', 'explain'].includes(codeTask) ? codeTask : 'build',
     createdAt: new Date().toISOString(),
   };
   await store.convsCreate(conv);
@@ -338,12 +352,14 @@ app.post('/conversations', auth, ah(async (req, res) => {
 app.put('/conversations/:id', auth, ah(async (req, res) => {
   const conv = await store.convsGet(req.params.id);
   if (!conv || conv.userId !== req.user.id) return res.status(404).json({ error: 'Introuvable.' });
-  const { title, messages, history, pinned } = req.body || {};
+  const { title, messages, history, pinned, assistantMode, codeTask } = req.body || {};
   const fields = {};
   if (title !== undefined) fields.title = title;
   if (messages !== undefined) fields.messages = messages;
   if (history !== undefined) fields.history = history;
   if (pinned !== undefined) fields.pinned = Boolean(pinned);
+  if (assistantMode !== undefined) fields.assistantMode = assistantMode === 'code' ? 'code' : 'chat';
+  if (codeTask !== undefined) fields.codeTask = ['build', 'debug', 'explain'].includes(codeTask) ? codeTask : 'build';
   fields.updatedAt = new Date().toISOString();
   const updated = await store.convsUpdate(req.params.id, fields);
   res.json(updated);
@@ -404,8 +420,12 @@ async function callGeminiNative(model, messages, key) {
 //  CHAT — multi-provider proxy (Groq via OpenAI-compat, Gemini native)
 // ---------------------------------------------------------------
 app.post('/chat', auth, ah(async (req, res) => {
-  const { messages, model } = req.body || {};
+  const { messages, model, mode } = req.body || {};
   if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages requis.' });
+  const specializedPrompt = codeSystemPrompt(mode);
+  const effectiveMessages = specializedPrompt
+    ? [{ role: 'system', content: specializedPrompt }, ...messages]
+    : messages;
 
   const chosenModel = MODEL_PROVIDER[model] ? model : DEFAULT_MODEL;
   const providerName = MODEL_PROVIDER[chosenModel];
@@ -418,7 +438,7 @@ app.post('/chat', auth, ah(async (req, res) => {
   try {
     // ---- Gemini: native endpoint ----
     if (providerName === 'gemini') {
-      const r = await callGeminiNative(chosenModel, messages, key);
+      const r = await callGeminiNative(chosenModel, effectiveMessages, key);
       if (!r.ok) {
         console.error('Gemini error', chosenModel, r.status, r.error);
         const status = (r.status === 401 || r.status === 403) ? 502 : (r.status || 502);
@@ -434,7 +454,7 @@ app.post('/chat', auth, ah(async (req, res) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${key}`,
       },
-      body: JSON.stringify({ model: chosenModel, messages, temperature: 0.7 }),
+      body: JSON.stringify({ model: chosenModel, messages: effectiveMessages, temperature: 0.7 }),
     });
     const data = await upstream.json();
     if (!upstream.ok) {
