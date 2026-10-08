@@ -462,6 +462,7 @@ app.get('/user/settings', auth, ah(async (req, res) => {
   const conversations = await store.convsListByUser(user.id);
 
   res.json({
+    user: publicUser(user),
     settings: user.settings || {},
     memory: user.memory || [],
     sidebarState: user.sidebarState || 'visible',
