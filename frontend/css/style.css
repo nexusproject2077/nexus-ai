@@ -5016,24 +5016,3 @@ button,
 .copy-code-btn { position: static; display: inline-flex; align-items: center; gap: 5px; min-height: 25px; padding: 0 8px; opacity: 1; border-radius: 7px; color: rgba(255,255,255,.68); background: rgba(255,255,255,.06); }
 .copy-code-btn svg { width: 13px; height: 13px; }
 .copy-code-btn.copied { color: #a7f3d0; border-color: rgba(110,231,183,.35); background: rgba(16,185,129,.16); }
-
-/* Dynamic Island capsule: centered just above the composer with a small gap. */
-.nexus-header,
-#sidebar.hidden ~ #main-content .nexus-header {
-    top: auto !important;
-    bottom: 184px;
-}
-
-/* Leave room for the capsule and fixed composer at the end of a conversation. */
-#main-content { padding-top: 22px !important; }
-#chat-box { padding-bottom: 205px !important; }
-
-@media (max-width: 768px) {
-    .nexus-header,
-    #sidebar.hidden ~ #main-content .nexus-header {
-        top: auto !important;
-        bottom: calc(168px + env(safe-area-inset-bottom, 0px));
-    }
-    #main-content { padding-top: 12px !important; }
-    #chat-box { padding-bottom: 190px !important; }
-}
