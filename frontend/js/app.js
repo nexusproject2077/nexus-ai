@@ -1499,11 +1499,6 @@ const registerPwd = document.getElementById('register-password');
 if (loginPwd) loginPwd.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
 if (registerPwd) registerPwd.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleRegister(); });
 
-// ===== VERIFIER TOKEN AU CHARGEMENT (toujours en dernier) =====
-if (getToken()) {
-    initChatPage();
-}
-
 // ===== SETTINGS =====
 const SETTINGS_KEY = 'nexus_settings';
 let _settingsCache = null;
@@ -2249,3 +2244,10 @@ window.savePhoneFromSettings = async function() {
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll(); // état initial
 })();
+
+
+// ===== DEMARRAGE SESSION =====
+// Initialise la page seulement apres l'initialisation de tout l'etat du script.
+if (getToken()) {
+    initChatPage();
+}
