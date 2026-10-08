@@ -255,6 +255,27 @@
                     <button type="button" class="code-workflow-btn" data-code-task="explain" onclick="selectCodeTask('explain')">Explain</button>
                     <span class="code-workflow-hint" id="code-workflow-hint">Fonctionnalité complète et cohérente</span>
                 </div>
+                <section class="code-studio hidden" id="code-studio" aria-label="Fichiers du projet et aperçu">
+                    <div class="code-studio-header">
+                        <div><strong>Projet généré</strong><span id="code-file-count">Aucun fichier</span></div>
+                        <div class="code-studio-actions">
+                            <button type="button" id="download-all-btn" title="Télécharger tous les fichiers au format ZIP" disabled>Télécharger ZIP</button>
+                            <button type="button" id="preview-btn" title="Afficher l’aperçu" disabled>Aperçu</button>
+                        </div>
+                    </div>
+                    <div class="generated-files" id="generated-files"></div>
+                    <div class="preview-panel hidden" id="preview-panel">
+                        <div class="preview-toolbar"><span>Aperçu isolé HTML/CSS/JS</span><div><button type="button" id="preview-reload-btn">Recharger</button><button type="button" id="preview-expand-btn">Ouvrir en grand</button></div></div>
+                        <iframe id="project-preview" title="Aperçu du projet" sandbox="allow-scripts allow-modals" referrerpolicy="no-referrer"></iframe>
+                        <pre class="preview-errors hidden" id="preview-errors" aria-live="polite"></pre>
+                    </div>
+                    <div class="github-panel" id="github-panel">
+                        <div><strong>GitHub</strong><span id="github-status">Non connecté</span></div>
+                        <button type="button" id="github-connect-btn">Connecter GitHub</button>
+                        <button type="button" id="github-read-btn">Lire un fichier</button>
+                        <button type="button" id="github-push-btn" disabled>Créer le commit</button>
+                    </div>
+                </section>
             </div>
 
             <div class="footer">

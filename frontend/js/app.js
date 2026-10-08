@@ -1194,7 +1194,116 @@ async function addMessage(className, message, isHTML = false, animate = true) {
         debouncedSave(conv);
     }
 
+    if (className === 'bot-message') {
+        const project = extractGeneratedProject(message);
+        if (project.files.length) setGeneratedProject(project);
+    }
+
     return msg;
+}
+
+// ===== CODE ARTEFACTS + ISOLATED STATIC PREVIEW =====
+let generatedProject = { files: [] };
+const svgIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l4 4v16H6zM14 2v5h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+
+function extractGeneratedProject(text) {
+    const hit = String(text || '').match(/```nexus-files\s*([\s\S]*?)```/i);
+    if (!hit) return { files: [] };
+    try {
+        const data = JSON.parse(hit[1].trim());
+        const files = (data.files || []).filter(f => f && typeof f.path === 'string' && typeof f.content === 'string' && isSafeProjectPath(f.path) && f.content.length <= 1024 * 1024)
+            .map(f => ({ path: f.path.replace(/\\/g, '/'), content: f.content, language: String(f.language || '').slice(0, 30) }));
+        return { files: files.slice(0, 50) };
+    } catch { return { files: [] }; }
+}
+function isSafeProjectPath(path) { return !!path && path.length <= 240 && !path.includes('..') && !path.startsWith('/') && !/[\x00-\x1f]/.test(path); }
+function fileSizeText(content) { const n = new Blob([content]).size; return n < 1024 ? `${n} o` : `${(n / 1024).toFixed(1)} Ko`; }
+function downloadBlob(name, blob) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+
+function setGeneratedProject(project) {
+    generatedProject = project;
+    const list = document.getElementById('generated-files');
+    const count = document.getElementById('code-file-count');
+    if (!list || !count) return;
+    list.replaceChildren();
+    count.textContent = `${project.files.length} fichier${project.files.length > 1 ? 's' : ''}`;
+    for (const file of project.files) {
+        const card = document.createElement('article'); card.className = 'generated-file-card';
+        const meta = document.createElement('div'); meta.className = 'generated-file-meta';
+        meta.innerHTML = `${svgIcon}<div><strong></strong><span></span></div>`;
+        meta.querySelector('strong').textContent = file.path;
+        meta.querySelector('span').textContent = `${file.language || file.path.split('.').pop() || 'texte'} · ${fileSizeText(file.content)}`;
+        const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Télécharger'; button.onclick = () => downloadBlob(file.path.split('/').pop(), new Blob([file.content], { type: 'text/plain;charset=utf-8' }));
+        card.append(meta, button); list.appendChild(card);
+    }
+    document.getElementById('download-all-btn').disabled = !project.files.length;
+    document.getElementById('preview-btn').disabled = !project.files.some(f => f.path.toLowerCase() === 'index.html');
+    document.getElementById('github-push-btn').disabled = !project.files.length;
+}
+
+function previewDocument() {
+    const html = generatedProject.files.find(f => /(^|\/)index\.html$/i.test(f.path));
+    if (!html) return '';
+    const byName = name => generatedProject.files.find(f => f.path === name || f.path.endsWith('/' + name));
+    let source = html.content;
+    source = source.replace(/<link([^>]*?)href=["']([^"']+)["']([^>]*)>/gi, (all, before, href, after) => {
+        const f = byName(href); return f && /\.css(?:$|\?)/i.test(href) ? `<style>\n${f.content}\n</style>` : all;
+    });
+    source = source.replace(/<script([^>]*?)src=["']([^"']+)["']([^>]*)><\/script>/gi, (all, before, src, after) => {
+        const f = byName(src); return f && /\.js(?:$|\?)/i.test(src) ? `<script${before}${after}>\n${f.content}\n<\/script>` : all;
+    });
+    const bridge = `<script>['error','unhandledrejection'].forEach(t=>addEventListener(t,e=>parent.postMessage({source:'nexus-preview',type:t,message:String(e.message||e.reason||'Erreur')},'*'))); const c=console.error; console.error=(...a)=>{parent.postMessage({source:'nexus-preview',type:'console',message:a.map(String).join(' ')},'*');c(...a)};<\/script>`;
+    return source.replace(/<head([^>]*)>/i, `<head$1>${bridge}`) || bridge + source;
+}
+function renderPreview() {
+    const frame = document.getElementById('project-preview'), panel = document.getElementById('preview-panel'), errors = document.getElementById('preview-errors');
+    if (!frame || !panel) return;
+    panel.classList.remove('hidden'); errors?.classList.add('hidden'); if (errors) errors.textContent = '';
+    frame.srcdoc = previewDocument();
+}
+function crc32(bytes) { let c = ~0; for (const b of bytes) { c ^= b; for (let i = 0; i < 8; i++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); } return ~c >>> 0; }
+function u16(n) { return [n & 255, (n >>> 8) & 255]; } function u32(n) { return [...u16(n), ...u16(n >>> 16)]; }
+function makeZip(files) { const enc = new TextEncoder(), chunks = [], entries = []; let offset = 0;
+    for (const f of files) { const name = enc.encode(f.path), data = enc.encode(f.content), crc = crc32(data); const local = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0), ...name, ...data]); chunks.push(local); entries.push({ name, data, crc, offset }); offset += local.length; }
+    const centralStart = offset; for (const e of entries) { const c = new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(e.crc), ...u32(e.data.length), ...u32(e.data.length), ...u16(e.name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(e.offset), ...e.name]); chunks.push(c); offset += c.length; }
+    chunks.push(new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(entries.length), ...u16(entries.length), ...u32(offset - centralStart), ...u32(centralStart), ...u16(0)])); return new Blob(chunks, { type: 'application/zip' }); }
+
+window.addEventListener('message', event => { if (event.data?.source !== 'nexus-preview') return; const errors = document.getElementById('preview-errors'); if (!errors) return; errors.classList.remove('hidden'); errors.textContent += `[${event.data.type}] ${event.data.message}\n`; });
+
+async function refreshGithubStatus() {
+    const status = document.getElementById('github-status'); if (!status || !getToken()) return;
+    try { const r = await fetch(`${API_BASE}/github/status`, { headers: authHeaders(), credentials: 'include' }); const d = await r.json(); status.textContent = d.connected ? `Connecté : ${d.login}` : 'Non connecté'; document.getElementById('github-connect-btn').textContent = d.connected ? 'Déconnecter' : 'Connecter GitHub'; } catch { status.textContent = 'Indisponible'; }
+}
+async function connectGithub() {
+    const button = document.getElementById('github-connect-btn');
+    if (button.textContent.includes('Déconnecter')) { await fetch(`${API_BASE}/github/disconnect`, { method: 'POST', headers: authHeaders(), credentials: 'include' }); return refreshGithubStatus(); }
+    const r = await fetch(`${API_BASE}/github/connect`, { headers: authHeaders(), credentials: 'include' }); const d = await r.json(); if (!r.ok) return showToast(d.error || 'Connexion GitHub indisponible.', 'error'); window.location.assign(d.url);
+}
+async function pushGeneratedProject() {
+    if (!generatedProject.files.length) return;
+    const reposResponse = await fetch(`${API_BASE}/github/repos`, { headers: authHeaders(), credentials: 'include' });
+    const repos = await reposResponse.json(); if (!reposResponse.ok || !repos.length) return showToast(repos.error || 'Aucun dépôt GitHub accessible.', 'error');
+    const choice = prompt(`Choisis un dépôt :\n${repos.map((r, i) => `${i + 1}. ${r.fullName}${r.private ? ' (privé)' : ''}`).join('\n')}`);
+    const selected = repos[Number(choice) - 1]; if (!selected) return;
+    const repo = selected.fullName;
+    const [owner, name] = repo.split('/');
+    const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: authHeaders(), credentials: 'include' });
+    const branches = await branchesResponse.json(); if (!branchesResponse.ok || !branches.length) return showToast(branches.error || 'Branches indisponibles.', 'error');
+    const branchChoice = prompt(`Choisis une branche :\n${branches.map((b, i) => `${i + 1}. ${b.name}`).join('\n')}`, String(Math.max(1, branches.findIndex(b => b.name === selected.defaultBranch) + 1)));
+    const branch = branches[Number(branchChoice) - 1]?.name; if (!branch) return;
+    const message = prompt('Message de commit :', 'Create files from Nexus AI'); if (!message) return;
+    if (!confirm(`Créer ou mettre à jour ${generatedProject.files.length} fichier(s) sur ${repo}/${branch} ?`)) return;
+    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/commit`, { method: 'POST', headers: authHeaders(), credentials: 'include', body: JSON.stringify({ branch, message, files: generatedProject.files, confirm: true }) });
+    const d = await r.json(); showToast(r.ok ? `Commit créé : ${d.results.length} fichier(s).` : (d.error || 'Commit impossible.'), r.ok ? '' : 'error', 4000);
+}
+async function readGithubFile() {
+    const repo = prompt('Dépôt à lire (propriétaire/nom) :'); if (!repo || !/^[^/]+\/[^/]+$/.test(repo)) return;
+    const branch = prompt('Branche ou ref :', 'main'); const path = prompt('Chemin du fichier :'); if (!branch || !path) return;
+    const [owner, name] = repo.split('/');
+    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/file?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(branch)}`, { headers: authHeaders(), credentials: 'include' });
+    const file = await r.json(); if (!r.ok) return showToast(file.error || 'Lecture impossible.', 'error');
+    setGeneratedProject({ files: [{ path: file.path, content: file.content, language: path.split('.').pop() }] });
+    showToast(`${file.path} chargé dans le projet.`, '', 3000);
 }
 
 function showTypingIndicator() {
@@ -1499,6 +1608,16 @@ async function handleMessage() {
 }
 
 if (sendButton) sendButton.addEventListener('click', handleMessage);
+
+document.getElementById('download-all-btn')?.addEventListener('click', () => downloadBlob('nexus-project.zip', makeZip(generatedProject.files)));
+document.getElementById('preview-btn')?.addEventListener('click', renderPreview);
+document.getElementById('preview-reload-btn')?.addEventListener('click', renderPreview);
+document.getElementById('preview-expand-btn')?.addEventListener('click', () => {
+    const html = previewDocument(); if (!html) return; const url = URL.createObjectURL(new Blob([html], { type: 'text/html' })); window.open(url, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(url), 60000);
+});
+document.getElementById('github-connect-btn')?.addEventListener('click', connectGithub);
+document.getElementById('github-read-btn')?.addEventListener('click', readGithubFile);
+document.getElementById('github-push-btn')?.addEventListener('click', pushGeneratedProject);
 
 if (userInput) {
     userInput.addEventListener('input', () => {
@@ -1999,6 +2118,9 @@ function refreshAssistantModeUI(conv = getModeConversation()) {
     });
     const workflow = document.getElementById('code-workflow');
     if (workflow) workflow.classList.toggle('hidden', mode !== 'code');
+    const studio = document.getElementById('code-studio');
+    if (studio) studio.classList.toggle('hidden', mode !== 'code');
+    if (mode === 'code') refreshGithubStatus();
     const hint = document.getElementById('code-workflow-hint');
     if (hint) hint.textContent = CODE_TASKS[task];
     if (userInput) userInput.placeholder = mode === 'code'

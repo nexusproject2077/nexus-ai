@@ -24,6 +24,31 @@ La **connexion sociale** (Google / GitHub) passe par **Firebase Authentication**
 renseigne [`frontend/js/firebase-config.js`](frontend/js/firebase-config.js) et
 suis la section 3 de [DEPLOY.md](DEPLOY.md).
 
+## Mode Code : fichiers, aperçu et GitHub
+
+En Mode Code, Nexus demande désormais à l’IA un bloc `nexus-files` structuré. Le
+frontend transforme ce bloc en cartes de fichiers téléchargeables et peut créer
+un ZIP localement. Les projets statiques avec `index.html` sont prévisualisés
+dans une iframe sandboxée : les CSS et JS locaux référencés sont incorporés pour
+l’aperçu. C’est une prévisualisation in-app, pas un serveur localhost sur la
+machine de l’utilisateur.
+
+L’intégration GitHub passe exclusivement par le backend. Configure ces variables
+secrètes côté hébergeur (jamais dans `frontend/`) :
+
+```text
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+GITHUB_REDIRECT_URI=https://API.example.com/github/callback
+GITHUB_COOKIE_SECRET=une-cle-aleatoire-longue
+FRONTEND_ORIGIN=https://nexus-ai.web.app
+```
+
+Crée une OAuth App GitHub avec l’URL de callback correspondante. Le jeton OAuth
+est conservé dans un cookie `HttpOnly`, `Secure`, `SameSite=None` de l’API et ne
+transite jamais dans JavaScript. L’UI demande une confirmation avant toute écriture;
+les fichiers sont ensuite créés/mis à jour sur la branche choisie via GitHub.
+
 ## Backend
 
 ```bash

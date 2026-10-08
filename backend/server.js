@@ -19,11 +19,17 @@ import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import { getStore, randomUUID } from './store.js';
 import { getFirebaseAdmin } from './firebase-admin.js';
 
 const app = express();
-app.use(cors());                       // allow the Firebase-hosted frontend
+app.use(cors({ origin: (origin, callback) => {
+  // Keep API usable from local development while allowing credentialed OAuth
+  // cookies only for the configured production origin.
+  if (!origin || origin === FRONTEND_ORIGIN || /^http:\/\/localhost(?::\d+)?$/.test(origin)) return callback(null, true);
+  callback(new Error('Origine non autorisée.'));
+}, credentials: true }));
 app.use(express.json({ limit: '12mb' })); // messages can carry file text
 
 const PORT        = process.env.PORT || 8080;
@@ -34,6 +40,11 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 // Google AI Studio exposes an OpenAI-compatible endpoint — same request shape.
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || '';
+const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || '';
+const FRONTEND_ORIGIN = (process.env.FRONTEND_ORIGIN || 'https://nexus-ai.web.app').replace(/\/$/, '');
+const GITHUB_COOKIE_SECRET = process.env.GITHUB_COOKIE_SECRET || JWT_SECRET;
 
 // Allow-listed models → which provider serves them (safety + routing).
 const MODEL_PROVIDER = {
@@ -50,7 +61,7 @@ const PROVIDERS = {
 };
 
 const CODE_SYSTEM_PROMPTS = {
-  build: `You are Nexus AI in Code Build mode. Produce production-ready, executable changes that fit the supplied architecture. When work spans files, use a Markdown heading containing the exact path for every file, explain the integration briefly, and provide complete changed functions or focused unified diffs. Preserve existing contracts unless migration is explicitly requested. Check imports, types, API shapes, configuration and error paths before answering.`,
+  build: `You are Nexus AI in Code Build mode. Produce production-ready, executable changes that fit the supplied architecture. When work spans files, return a single JSON block tagged nexus-files (no markdown inside it) with this exact shape: {"files":[{"path":"index.html","content":"...","language":"html"}]}. Include every complete generated text file, use relative safe paths only, and keep a short human explanation outside the block. This JSON becomes downloadable project files and a static HTML/CSS/JS preview. Preserve existing contracts unless migration is explicitly requested. Check imports, API shapes, configuration and error paths before answering.`,
   debug: `You are Nexus AI in Code Debug mode. Read logs and code carefully, identify the most likely root cause with evidence, then provide the smallest safe repair. When files are involved, name exact paths and include executable patches or replacement functions. Do not invent successful test results; state concise verification commands and expected outcomes.`,
   explain: `You are Nexus AI in Code Explain mode. Explain code accurately from the supplied context, including data flow, dependencies, risks and side effects. If a change is requested, provide minimal executable edits organized by exact file path. Keep technical terminology precise and distinguish evidence from assumptions.`
 };
@@ -77,6 +88,44 @@ function signToken(user) {
 
 function publicUser(user) {
   return { id: user.id, username: user.username, email: user.email, phone: user.phone || '' };
+}
+
+function parseCookies(req) {
+  return Object.fromEntries(String(req.headers.cookie || '').split(';').map(part => {
+    const i = part.indexOf('=');
+    return i < 0 ? [] : [part.slice(0, i).trim(), decodeURIComponent(part.slice(i + 1).trim())];
+  }).filter(pair => pair.length));
+}
+
+function githubCookieOptions(maxAge = 0) {
+  return { httpOnly: true, secure: true, sameSite: 'none', path: '/', ...(maxAge ? { maxAge } : {}) };
+}
+
+function githubTokenFromRequest(req) {
+  const raw = parseCookies(req).nexus_github;
+  if (!raw) return null;
+  try { return jwt.verify(raw, GITHUB_COOKIE_SECRET).githubToken || null; } catch { return null; }
+}
+
+function safePath(value) {
+  const path = String(value || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!path || path.length > 240 || path.includes('..') || /[\x00-\x1f]/.test(path)) return null;
+  return path;
+}
+
+function githubHeaders(token) {
+  return { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' };
+}
+
+async function githubRequest(path, token, options = {}) {
+  const response = await fetch(`https://api.github.com${path}`, { ...options, headers: { ...githubHeaders(token), ...(options.headers || {}) } });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(data?.message || `GitHub a répondu ${response.status}.`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
 }
 
 // Light phone normalisation/validation: keep +, digits and spaces; 6-20 digits.
@@ -323,6 +372,124 @@ app.post('/auth/firebase', ah(async (req, res) => {
     console.error('verifyIdToken failed:', e.message);
     res.status(401).json({ error: 'Jeton Firebase invalide.' });
   }
+}));
+
+// ---------------------------------------------------------------
+//  GITHUB — OAuth and repository actions. The OAuth access token is
+//  kept only in a signed HttpOnly cookie on this API domain;
+//  it is never returned to JavaScript or stored in conversation data.
+// ---------------------------------------------------------------
+app.get('/github/connect', auth, (req, res) => {
+  if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET || !GITHUB_REDIRECT_URI) {
+    return res.status(501).json({ error: 'GitHub OAuth n’est pas configuré sur le serveur.' });
+  }
+  const state = jwt.sign({ userId: req.user.id, nonce: crypto.randomUUID() }, GITHUB_COOKIE_SECRET, { expiresIn: '10m' });
+  res.cookie('nexus_github_state', state, githubCookieOptions(10 * 60 * 1000));
+  const url = new URL('https://github.com/login/oauth/authorize');
+  url.searchParams.set('client_id', GITHUB_CLIENT_ID);
+  url.searchParams.set('redirect_uri', GITHUB_REDIRECT_URI);
+  url.searchParams.set('scope', 'repo read:user');
+  url.searchParams.set('state', state);
+  res.json({ url: url.toString() });
+});
+
+app.get('/github/callback', ah(async (req, res) => {
+  const { code, state } = req.query;
+  const stateCookie = parseCookies(req).nexus_github_state;
+  if (!code || !state || state !== stateCookie) return res.redirect(`${FRONTEND_ORIGIN}/?github=failed`);
+  try {
+    jwt.verify(state, GITHUB_COOKIE_SECRET);
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: GITHUB_CLIENT_ID, client_secret: GITHUB_CLIENT_SECRET, code, redirect_uri: GITHUB_REDIRECT_URI }),
+    });
+    const tokenData = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenData.access_token) throw new Error(tokenData.error_description || 'Autorisation GitHub refusée.');
+    const session = jwt.sign({ githubToken: tokenData.access_token }, GITHUB_COOKIE_SECRET, { expiresIn: '7d' });
+    res.cookie('nexus_github', session, githubCookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.clearCookie('nexus_github_state', githubCookieOptions());
+    res.redirect(`${FRONTEND_ORIGIN}/?github=connected`);
+  } catch (error) {
+    console.error('GitHub OAuth callback:', error.message);
+    res.redirect(`${FRONTEND_ORIGIN}/?github=failed`);
+  }
+}));
+
+app.get('/github/status', auth, ah(async (req, res) => {
+  const token = githubTokenFromRequest(req);
+  if (!token) return res.json({ connected: false });
+  try {
+    const profile = await githubRequest('/user', token);
+    res.json({ connected: true, login: profile.login, avatarUrl: profile.avatar_url });
+  } catch { res.clearCookie('nexus_github', githubCookieOptions()); res.json({ connected: false }); }
+}));
+
+app.post('/github/disconnect', auth, (req, res) => {
+  res.clearCookie('nexus_github', githubCookieOptions());
+  res.json({ ok: true });
+});
+
+app.get('/github/repos', auth, ah(async (req, res) => {
+  const token = githubTokenFromRequest(req);
+  if (!token) return res.status(401).json({ error: 'Connecte GitHub avant de consulter tes dépôts.' });
+  const repos = await githubRequest('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member', token);
+  res.json(repos.map(r => ({ fullName: r.full_name, name: r.name, private: r.private, defaultBranch: r.default_branch, updatedAt: r.updated_at })));
+}));
+
+app.get('/github/repos/:owner/:repo/branches', auth, ah(async (req, res) => {
+  const token = githubTokenFromRequest(req);
+  if (!token) return res.status(401).json({ error: 'Connecte GitHub avant de consulter tes branches.' });
+  const branches = await githubRequest(`/repos/${encodeURIComponent(req.params.owner)}/${encodeURIComponent(req.params.repo)}/branches?per_page=100`, token);
+  res.json(branches.map(b => ({ name: b.name, sha: b.commit?.sha })));
+}));
+
+app.get('/github/repos/:owner/:repo/file', auth, ah(async (req, res) => {
+  const token = githubTokenFromRequest(req);
+  const filePath = safePath(req.query.path);
+  const ref = String(req.query.ref || 'HEAD');
+  if (!token) return res.status(401).json({ error: 'Connecte GitHub avant de lire un fichier.' });
+  if (!filePath) return res.status(400).json({ error: 'Chemin de fichier invalide.' });
+  const item = await githubRequest(`/repos/${encodeURIComponent(req.params.owner)}/${encodeURIComponent(req.params.repo)}/contents/${filePath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(ref)}`, token);
+  if (Array.isArray(item) || item.type !== 'file') return res.status(400).json({ error: 'Ce chemin ne désigne pas un fichier texte.' });
+  const content = Buffer.from(String(item.content || '').replace(/\n/g, ''), 'base64').toString('utf8');
+  res.json({ path: item.path, sha: item.sha, size: item.size, content });
+}));
+
+app.post('/github/repos/:owner/:repo/commit', auth, ah(async (req, res) => {
+  const token = githubTokenFromRequest(req);
+  const { branch, message, files, confirm } = req.body || {};
+  if (!token) return res.status(401).json({ error: 'Connecte GitHub avant toute écriture.' });
+  if (confirm !== true) return res.status(400).json({ error: 'Confirmation explicite requise avant la création du commit.' });
+  if (!/^[A-Za-z0-9._/-]{1,200}$/.test(String(branch || ''))) return res.status(400).json({ error: 'Branche invalide.' });
+  if (!Array.isArray(files) || files.length < 1 || files.length > 50) return res.status(400).json({ error: 'Fournis entre 1 et 50 fichiers.' });
+  const owner = encodeURIComponent(req.params.owner), repo = encodeURIComponent(req.params.repo);
+  const cleanFiles = files.map(f => ({ path: safePath(f.path), content: typeof f.content === 'string' ? f.content : null, sha: typeof f.sha === 'string' ? f.sha : undefined }));
+  if (cleanFiles.some(f => !f.path || f.content === null || Buffer.byteLength(f.content, 'utf8') > 1024 * 1024)) return res.status(400).json({ error: 'Fichier invalide ou supérieur à 1 Mo.' });
+  // Use Git's blob/tree/commit/ref endpoints so all selected files are written
+  // in one atomic commit rather than one commit per file.
+  const ref = await githubRequest(`/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);
+  const parentSha = ref.object?.sha;
+  const parent = await githubRequest(`/repos/${owner}/${repo}/git/commits/${encodeURIComponent(parentSha)}`, token);
+  const tree = [];
+  for (const file of cleanFiles) {
+    const blob = await githubRequest(`/repos/${owner}/${repo}/git/blobs`, token, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: file.content, encoding: 'utf-8' }),
+    });
+    tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blob.sha });
+  }
+  const createdTree = await githubRequest(`/repos/${owner}/${repo}/git/trees`, token, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base_tree: parent.tree.sha, tree }),
+  });
+  const commit = await githubRequest(`/repos/${owner}/${repo}/git/commits`, token, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: String(message || 'Update from Nexus AI').slice(0, 200), tree: createdTree.sha, parents: [parentSha] }),
+  });
+  await githubRequest(`/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, token, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sha: commit.sha, force: false }),
+  });
+  res.json({ ok: true, results: cleanFiles.map(f => ({ path: f.path, commit: commit.sha })) });
 }));
 
 // ---------------------------------------------------------------
