@@ -168,6 +168,241 @@ async function createMongoStore(uri, dbName) {
       return cleanUser(await usersCol.findOne({ $or: [{ id }, ...(ObjectId.isValid(id) ? [{ _id: new ObjectId(id) }] : [])] }));
     },
 
+    async usersMergeIdentityIntoEmail(email, sourceId) {
+      if (!email) return null;
+
+      const escaped = String(email).replace(/[.*+?^${}()|[\]\\]/g, '\\    async usersGetById(id) {
+      return cleanUser(await usersCol.findOne({ $or: [{ id }, ...(ObjectId.isValid(id) ? [{ _id: new ObjectId(id) }] : [])] }));
+    },
+
+');
+      let canonicalDoc = await usersCol.findOne({ email: { $regex: '^' + escaped + '    async usersResolveSocialDuplicates(email, preferredId) {
+      const docs = await usersCol.find({ email }).toArray();
+      if (docs.length <= 1) return cleanUser(docs[0] || null);
+
+      const scored = [];
+      for (const doc of docs) {
+        const clean = cleanUser(doc);
+        const ids = [clean.id, String(doc._id)];
+        const queryIds = [...new Set(ids.flatMap(v => {
+          const out = [v];
+          if (ObjectId.isValid(v)) out.push(new ObjectId(v));
+          return out;
+        }))];
+        const count = await convsCol.countDocuments({ userId: { $in: queryIds } });
+        scored.push({ doc, clean, count });
+      }
+
+      scored.sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        if (a.clean.id === preferredId) return -1;
+        if (b.clean.id === preferredId) return 1;
+        return new Date(a.clean.createdAt || 0) - new Date(b.clean.createdAt || 0);
+      });
+
+      const primary = scored[0];
+      const duplicates = scored.slice(1);
+
+      const mergedMemory = [...new Set(scored.flatMap(x => Array.isArray(x.clean.memory) ? x.clean.memory : []))];
+      const mergedSettings = Object.assign({}, ...scored.map(x => x.clean.settings || {}));
+      const merged = {
+        ...primary.clean,
+        email,
+        memory: mergedMemory,
+        settings: mergedSettings,
+        phone: primary.clean.phone || scored.find(x => x.clean.phone)?.clean.phone || '',
+        sidebarState: primary.clean.sidebarState || scored.find(x => x.clean.sidebarState)?.clean.sidebarState || 'visible',
+      };
+      delete merged._id;
+
+      // Re-link all conversations from duplicate account IDs to the primary account.
+      for (const x of scored) {
+        const rawIds = [x.clean.id, String(x.doc._id)];
+        const queryIds = [...new Set(rawIds.flatMap(v => {
+          const out = [v];
+          if (ObjectId.isValid(v)) out.push(new ObjectId(v));
+          return out;
+        }))];
+        await convsCol.updateMany(
+          { userId: { $in: queryIds } },
+          { $set: { userId: primary.clean.id } }
+        );
+      }
+
+      const primaryFilter = primary.doc._id instanceof ObjectId
+        ? { _id: primary.doc._id }
+        : idFilter(primary.clean.id);
+
+      // Delete duplicates first so legacy unique indexes (e.g. username_1)
+      // cannot block the final write to the surviving account.
+      for (const x of duplicates) {
+        await usersCol.deleteOne({ _id: x.doc._id });
+      }
+
+      await usersCol.updateOne(
+        primaryFilter,
+        { $set: { ...merged, id: primary.clean.id } }
+      );
+
+      // Recreate the unique email index after duplicate cleanup when possible.
+      await usersCol.createIndex({ email: 1 }, { unique: true, sparse: true }).catch(() => {});
+
+      return cleanUser(await usersCol.findOne(primaryFilter));
+    },
+
+    async usersCreate(user) {
+      await usersCol.updateOne(
+        { id: user.id },
+        { $setOnInsert: { ...user } },
+        { upsert: true }
+      );
+      return user;
+    },
+
+    async usersSave(user) {
+      const filter = ObjectId.isValid(user.id)
+        ? { $or: [{ id: user.id }, { _id: new ObjectId(user.id) }] }
+        : { id: user.id };
+
+      // Never write MongoDB's immutable _id back into $set, and only persist
+      // fields Nexus actually edits after account creation.
+      const mutable = {
+        id: user.id,
+        email: user.email,
+        phone: user.phone || '',
+        settings: user.settings || {},
+        memory: Array.isArray(user.memory) ? user.memory : [],
+        sidebarState: user.sidebarState || 'visible',
+        provider: user.provider || 'password',
+      };
+      if (user.passwordHash !== undefined) mutable.passwordHash = user.passwordHash;
+
+      await usersCol.updateOne(
+        filter,
+        { $set: mutable },
+        { upsert: true }
+      );
+      return { ...user, ...mutable };
+    },
+
+    async convsListByUser(userId) {
+      const userIds = [userId];
+      if (ObjectId.isValid(userId)) userIds.push(new ObjectId(userId));
+
+      return (await convsCol
+        .find({ userId: { $in: userIds } })
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .toArray())
+        .map(cleanConv);
+    },
+
+    async convsGet(id) {
+      return cleanConv(await convsCol.findOne(idFilter(id)));
+    },
+
+    async convsCreate(conv) {
+      await convsCol.updateOne(
+        { _id: conv._id },
+        { $setOnInsert: { ...conv } },
+        { upsert: true }
+      );
+      return conv;
+    },
+
+    async convsUpdate(id, fields) {
+      const result = await convsCol.findOneAndUpdate(
+        idFilter(id),
+        { $set: { ...fields } },
+        { returnDocument: 'after' }
+      );
+      return cleanConv(result);
+    },
+
+    async convsDelete(id) {
+      await convsCol.deleteOne(idFilter(id));
+    },
+  };
+}
+
+// ---------------------------------------------------------------
+//  FACTORY
+// ---------------------------------------------------------------
+let _store = null;
+
+export async function getStore() {
+  if (_store) return _store;
+
+  // Prefer MongoDB Atlas whenever a URI is configured. Firestore remains
+  // available only as a fallback during migration.
+  if (MONGODB_URI) {
+    _store = await createMongoStore(MONGODB_URI, MONGODB_DB);
+    console.log(`Storage: MongoDB Atlas (${MONGODB_DB})`);
+  } else if (USE_FIRESTORE) {
+    const admin = getFirebaseAdmin();
+    _store = createFirestoreStore(admin.firestore());
+    console.log('Storage: Firestore');
+  } else {
+    _store = createMemoryStore();
+    console.log('Storage: in-memory (configure MONGODB_URI for persistence)');
+  }
+
+  return _store;
+}
+
+export { randomUUID };
+, $options: 'i' } });
+
+      const sourceFilter = sourceId
+        ? { $or: [{ id: sourceId }, ...(ObjectId.isValid(sourceId) ? [{ _id: new ObjectId(sourceId) }] : [])] }
+        : null;
+      const sourceDoc = sourceFilter ? await usersCol.findOne(sourceFilter) : null;
+
+      if (!canonicalDoc && sourceDoc) canonicalDoc = sourceDoc;
+      if (!canonicalDoc) return null;
+
+      const canonical = cleanUser(canonicalDoc);
+      const canonicalId = canonical.id;
+
+      if (sourceDoc && String(sourceDoc._id) !== String(canonicalDoc._id)) {
+        const source = cleanUser(sourceDoc);
+        const merged = {
+          username: canonical.username || source.username,
+          email: canonical.email || source.email || email,
+          phone: canonical.phone || source.phone || '',
+          settings: { ...(source.settings || {}), ...(canonical.settings || {}) },
+          memory: [...new Set([
+            ...(Array.isArray(source.memory) ? source.memory : []),
+            ...(Array.isArray(canonical.memory) ? canonical.memory : []),
+          ])],
+          sidebarState: canonical.sidebarState || source.sidebarState || 'visible',
+          provider: canonical.provider || source.provider || 'password',
+        };
+        if (!canonical.passwordHash && source.passwordHash) merged.passwordHash = source.passwordHash;
+
+        await usersCol.updateOne(
+          { _id: canonicalDoc._id },
+          { $set: { ...merged, id: canonicalId } }
+        );
+      }
+
+      if (sourceId && sourceId !== canonicalId) {
+        const sourceIds = [sourceId];
+        if (ObjectId.isValid(sourceId)) sourceIds.push(new ObjectId(sourceId));
+        await convsCol.updateMany(
+          { userId: { $in: sourceIds } },
+          { $set: { userId: canonicalId } }
+        );
+      }
+
+      const canonicalIds = [canonicalId];
+      if (ObjectId.isValid(canonicalId)) canonicalIds.push(new ObjectId(canonicalId));
+      await convsCol.updateMany(
+        { userId: { $in: canonicalIds } },
+        { $set: { userId: canonicalId } }
+      );
+
+      return cleanUser(await usersCol.findOne({ _id: canonicalDoc._id }));
+    },
     async usersResolveSocialDuplicates(email, preferredId) {
       const docs = await usersCol.find({ email }).toArray();
       if (docs.length <= 1) return cleanUser(docs[0] || null);
