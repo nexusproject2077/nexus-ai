@@ -1320,12 +1320,22 @@ function setSelectedGithubRepo(repo, branch) {
 }
 function updateGithubSelectionUI() {
     const readBtn = document.getElementById('github-read-btn');
-    if (!readBtn) return;
-    const label = readBtn.querySelector('span');
+    const chip = document.getElementById('active-github-repo');
+    const chipName = document.getElementById('active-github-repo-name');
     const repo = selectedGithubRepo();
     const branch = selectedGithubBranch();
-    if (label) label.textContent = repo ? `Dépôt : ${repo.split('/').pop()}` : 'Sélectionner un dépôt';
-    readBtn.title = repo ? `${repo} · ${branch || 'branche par défaut'}` : 'Sélectionner un dépôt GitHub';
+
+    if (readBtn) {
+        const label = readBtn.querySelector('span');
+        if (label) label.textContent = repo ? `Dépôt : ${repo.split('/').pop()}` : 'Sélectionner un dépôt';
+        readBtn.title = repo ? `${repo} · ${branch || 'branche par défaut'}` : 'Sélectionner un dépôt GitHub';
+    }
+
+    if (chip && chipName) {
+        chip.classList.toggle('hidden', !repo);
+        chipName.textContent = repo ? repo.split('/').pop() : '';
+        chip.title = repo ? `${repo} · ${branch || 'branche par défaut'}` : '';
+    }
 }
 function consumeGithubOAuthReturn() {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -1865,6 +1875,7 @@ document.getElementById('preview-expand-btn')?.addEventListener('click', () => {
 });
 document.getElementById('github-connect-btn')?.addEventListener('click', connectGithub);
 document.getElementById('github-read-btn')?.addEventListener('click', readGithubRepository);
+document.getElementById('active-github-repo')?.addEventListener('click', readGithubRepository);
 document.getElementById('github-push-btn')?.addEventListener('click', pushGeneratedProject);
 
 if (userInput) {
