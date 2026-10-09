@@ -6143,3 +6143,34 @@ body {
 #main-content {
     background: transparent !important;
 }
+
+
+/* Mobile home branding placement — user-marked zone below mode island */
+@media (max-width: 768px) {
+    .empty-logo {
+        top: calc(env(safe-area-inset-top, 0px) + 126px) !important;
+    }
+    .groq-banner {
+        top: calc(env(safe-area-inset-top, 0px) + 176px) !important;
+    }
+    .empty-subtitle {
+        top: calc(env(safe-area-inset-top, 0px) + 224px) !important;
+    }
+    .suggestion-grid {
+        top: calc(env(safe-area-inset-top, 0px) + 254px) !important;
+    }
+}
+@media (max-width: 430px) {
+    .empty-logo {
+        top: calc(env(safe-area-inset-top, 0px) + 122px) !important;
+    }
+    .groq-banner {
+        top: calc(env(safe-area-inset-top, 0px) + 168px) !important;
+    }
+    .empty-subtitle {
+        top: calc(env(safe-area-inset-top, 0px) + 210px) !important;
+    }
+    .suggestion-grid {
+        top: calc(env(safe-area-inset-top, 0px) + 240px) !important;
+    }
+}
