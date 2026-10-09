@@ -1647,7 +1647,7 @@ async function webSearch(query) {
     const key = s.webSearchKey || (provider === 'tavily' ? TAVILY_KEY : '');
     const maxResults = parseInt(s.webSearchMaxResults) || 5;
 
-    if (!key) throw new Error('Clé API manquante — configurez-la dans Paramètres › Applications');
+    if (!key) throw new Error('Clé API manquante — configurez-la dans Réglages › Applications');
 
     if (provider === 'tavily') {
         const res = await fetch('https://api.tavily.com/search', {
@@ -2275,7 +2275,7 @@ function showSettingsCategoryIndex() {
     page.classList.remove('settings-detail-open');
     const heading = id('settings-page-header-title');
     const backLabel = id('settings-back-label');
-    if (heading) heading.textContent = 'Paramètres';
+    if (heading) heading.textContent = 'Réglages';
     if (backLabel) backLabel.textContent = 'Retour';
 }
 
@@ -2350,8 +2350,8 @@ window.switchSettingsTab = function(tab) {
     if (isMobile()) page?.classList.add('settings-detail-open');
     const heading = id('settings-page-header-title');
     const backLabel = id('settings-back-label');
-    if (heading) heading.textContent = isMobile() ? settingsTabTitles[tab] : 'Paramètres';
-    if (backLabel) backLabel.textContent = isMobile() ? 'Paramètres' : 'Retour';
+    if (heading) heading.textContent = isMobile() ? settingsTabTitles[tab] : 'Réglages';
+    if (backLabel) backLabel.textContent = isMobile() ? 'Réglages' : 'Retour';
     const content = document.querySelector('.settings-content');
     if (content) content.scrollTop = 0;
 };
