@@ -6681,3 +6681,85 @@ body.settings-page-open { overflow: hidden !important; }
         margin-top: 10px !important;
     }
 }
+
+
+/* Account settings: no overflowing phone field or save button. */
+#tab-compte .account-phone-row,
+#tab-compte .account-phone-row > div,
+#tab-compte .phone-setting-field {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+#tab-compte .phone-setting-field {
+    flex: 1 1 auto;
+    flex-shrink: 1;
+}
+#tab-compte .phone-setting-field .settings-input {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+#tab-compte .phone-setting-field .settings-action-btn {
+    flex: 0 0 auto;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Destructive action must read as destructive, not as neutral glass. */
+#tab-compte .settings-action-btn.danger {
+    color: #ff5f67 !important;
+    background: rgba(255,69,78,.13) !important;
+    border: 1px solid rgba(255,69,78,.4) !important;
+    box-shadow: none !important;
+}
+#tab-compte .settings-action-btn.danger:hover,
+#tab-compte .settings-action-btn.danger:focus-visible {
+    color: #fff !important;
+    background: rgba(255,69,78,.3) !important;
+    border-color: #ff5f67 !important;
+}
+
+/* The brand stays centered; category is already named by the page heading. */
+.settings-page-header .settings-page-header-title {
+    display: none !important;
+}
+@media (max-width: 768px) {
+    #tab-compte .account-phone-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    #tab-compte .account-phone-row > div,
+    #tab-compte .phone-setting-field {
+        width: 100% !important;
+    }
+    #tab-compte .phone-setting-field {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+    }
+    #tab-compte .phone-setting-field .settings-input,
+    #tab-compte .phone-setting-field .settings-action-btn {
+        display: block;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        flex: 0 0 auto !important;
+    }
+    #tab-compte .phone-setting-field .settings-input {
+        min-height: 46px !important;
+        font-size: 16px !important;
+    }
+    #tab-compte .phone-setting-field .settings-action-btn {
+        min-height: 44px !important;
+    }
+    #tab-compte .account-phone-row .settings-desc {
+        max-width: 100%;
+        overflow-wrap: break-word;
+    }
+}
