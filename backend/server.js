@@ -501,6 +501,29 @@ app.get('/github/repos/:owner/:repo/branches', auth, ah(async (req, res) => {
   res.json(branches.map(b => ({ name: b.name, sha: b.commit?.sha })));
 }));
 
+
+app.get('/github/repos/:owner/:repo/tree', auth, ah(async (req, res) => {
+  const token = githubTokenFromRequest(req);
+  const refName = String(req.query.ref || 'HEAD');
+  if (!token) return res.status(401).json({ error: 'Connecte GitHub avant de consulter un dépôt.' });
+
+  const owner = encodeURIComponent(req.params.owner);
+  const repo = encodeURIComponent(req.params.repo);
+  const ref = await githubRequest(`/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(refName)}`, token);
+  const commitSha = ref.object?.sha;
+  if (!commitSha) return res.status(404).json({ error: 'Branche introuvable.' });
+
+  const commit = await githubRequest(`/repos/${owner}/${repo}/git/commits/${encodeURIComponent(commitSha)}`, token);
+  const tree = await githubRequest(`/repos/${owner}/${repo}/git/trees/${encodeURIComponent(commit.tree.sha)}?recursive=1`, token);
+
+  const files = (tree.tree || [])
+    .filter(item => item.type === 'blob' && item.path)
+    .slice(0, 5000)
+    .map(item => ({ path: item.path, sha: item.sha, size: item.size || 0 }));
+
+  res.json({ ref: refName, truncated: !!tree.truncated, files });
+}));
+
 app.get('/github/repos/:owner/:repo/file', auth, ah(async (req, res) => {
   const token = githubTokenFromRequest(req);
   const filePath = safePath(req.query.path);
