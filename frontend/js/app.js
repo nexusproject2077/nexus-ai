@@ -2522,6 +2522,10 @@ function renderEmptyState() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
                 ${currentModel.startsWith('gemini-') ? 'Propulsé par Google Gemini' : 'Propulsé par Groq'} — <strong>Réponses instantanées</strong>
             </div>
+            <svg class="jeran-logo" viewBox="0 0 64 64" aria-label="NEXUS IA" role="img">
+                <path class="j1" d="M 33 11 L 16 27 L 33 43" />
+                <path class="j2" d="M 35 25 L 51 41 L 35 57" />
+            </svg>
             <p class="empty-subtitle">Par où veux-tu commencer ?</p>
             <div class="suggestion-grid">${cards}</div>
         </div>`;
