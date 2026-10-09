@@ -133,6 +133,8 @@ function initChatPage() {
     document.getElementById('auth-page').classList.add('hidden');
     document.getElementById('chat-page').classList.remove('hidden');
 
+    consumeGithubOAuthReturn();
+
     const user = getUser();
     if (user) document.getElementById('sidebar-username').textContent = `@${user.username}`;
 
@@ -1270,37 +1272,79 @@ function makeZip(files) { const enc = new TextEncoder(), chunks = [], entries = 
 
 window.addEventListener('message', event => { if (event.data?.source !== 'nexus-preview') return; const errors = document.getElementById('preview-errors'); if (!errors) return; errors.classList.remove('hidden'); errors.textContent += `[${event.data.type}] ${event.data.message}\n`; });
 
+function githubSession() {
+    return sessionStorage.getItem('nexus_github_session') || '';
+}
+function githubAuthHeaders() {
+    const headers = authHeaders();
+    const session = githubSession();
+    if (session) headers['X-GitHub-Session'] = session;
+    return headers;
+}
+function consumeGithubOAuthReturn() {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const session = hash.get('github_session');
+    const failed = hash.get('github') === 'failed';
+
+    if (session) {
+        sessionStorage.setItem('nexus_github_session', session);
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        setTimeout(() => {
+            refreshGithubStatus();
+            showToast('GitHub connecté.', '', 2500);
+        }, 0);
+    } else if (failed) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        setTimeout(() => showToast('Connexion GitHub échouée.', 'error', 3500), 0);
+    }
+}
 async function refreshGithubStatus() {
     const status = document.getElementById('github-status'); if (!status || !getToken()) return;
-    try { const r = await fetch(`${API_BASE}/github/status`, { headers: authHeaders(), credentials: 'include' }); const d = await r.json(); status.textContent = d.connected ? `Connecté : ${d.login}` : 'Non connecté'; document.getElementById('github-connect-btn').textContent = d.connected ? 'Déconnecter' : 'Connecter GitHub'; } catch { status.textContent = 'Indisponible'; }
+    try {
+        const r = await fetch(`${API_BASE}/github/status`, { headers: githubAuthHeaders(), credentials: 'include' });
+        const d = await r.json();
+        status.textContent = d.connected ? `Connecté : ${d.login}` : 'Non connecté';
+        document.getElementById('github-connect-btn').textContent = d.connected ? 'Déconnecter' : 'Connecter GitHub';
+        const readBtn = document.getElementById('github-read-btn');
+        if (readBtn) readBtn.disabled = !d.connected;
+    } catch {
+        status.textContent = 'Indisponible';
+    }
 }
 async function connectGithub() {
     const button = document.getElementById('github-connect-btn');
-    if (button.textContent.includes('Déconnecter')) { await fetch(`${API_BASE}/github/disconnect`, { method: 'POST', headers: authHeaders(), credentials: 'include' }); return refreshGithubStatus(); }
-    const r = await fetch(`${API_BASE}/github/connect`, { headers: authHeaders(), credentials: 'include' }); const d = await r.json(); if (!r.ok) return showToast(d.error || 'Connexion GitHub indisponible.', 'error'); window.location.assign(d.url);
+    if (button.textContent.includes('Déconnecter')) {
+        sessionStorage.removeItem('nexus_github_session');
+        await fetch(`${API_BASE}/github/disconnect`, { method: 'POST', headers: authHeaders(), credentials: 'include' });
+        return refreshGithubStatus();
+    }
+    const r = await fetch(`${API_BASE}/github/connect`, { headers: authHeaders(), credentials: 'include' });
+    const d = await r.json();
+    if (!r.ok) return showToast(d.error || 'Connexion GitHub indisponible.', 'error');
+    window.location.assign(d.url);
 }
 async function pushGeneratedProject() {
     if (!generatedProject.files.length) return;
-    const reposResponse = await fetch(`${API_BASE}/github/repos`, { headers: authHeaders(), credentials: 'include' });
+    const reposResponse = await fetch(`${API_BASE}/github/repos`, { headers: githubAuthHeaders(), credentials: 'include' });
     const repos = await reposResponse.json(); if (!reposResponse.ok || !repos.length) return showToast(repos.error || 'Aucun dépôt GitHub accessible.', 'error');
     const choice = prompt(`Choisis un dépôt :\n${repos.map((r, i) => `${i + 1}. ${r.fullName}${r.private ? ' (privé)' : ''}`).join('\n')}`);
     const selected = repos[Number(choice) - 1]; if (!selected) return;
     const repo = selected.fullName;
     const [owner, name] = repo.split('/');
-    const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: authHeaders(), credentials: 'include' });
+    const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: githubAuthHeaders(), credentials: 'include' });
     const branches = await branchesResponse.json(); if (!branchesResponse.ok || !branches.length) return showToast(branches.error || 'Branches indisponibles.', 'error');
     const branchChoice = prompt(`Choisis une branche :\n${branches.map((b, i) => `${i + 1}. ${b.name}`).join('\n')}`, String(Math.max(1, branches.findIndex(b => b.name === selected.defaultBranch) + 1)));
     const branch = branches[Number(branchChoice) - 1]?.name; if (!branch) return;
     const message = prompt('Message de commit :', 'Create files from Nexus AI'); if (!message) return;
     if (!confirm(`Créer ou mettre à jour ${generatedProject.files.length} fichier(s) sur ${repo}/${branch} ?`)) return;
-    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/commit`, { method: 'POST', headers: authHeaders(), credentials: 'include', body: JSON.stringify({ branch, message, files: generatedProject.files, confirm: true }) });
+    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/commit`, { method: 'POST', headers: githubAuthHeaders(), credentials: 'include', body: JSON.stringify({ branch, message, files: generatedProject.files, confirm: true }) });
     const d = await r.json(); showToast(r.ok ? `Commit créé : ${d.results.length} fichier(s).` : (d.error || 'Commit impossible.'), r.ok ? '' : 'error', 4000);
 }
 async function readGithubFile() {
     const repo = prompt('Dépôt à lire (propriétaire/nom) :'); if (!repo || !/^[^/]+\/[^/]+$/.test(repo)) return;
     const branch = prompt('Branche ou ref :', 'main'); const path = prompt('Chemin du fichier :'); if (!branch || !path) return;
     const [owner, name] = repo.split('/');
-    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/file?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(branch)}`, { headers: authHeaders(), credentials: 'include' });
+    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/file?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(branch)}`, { headers: githubAuthHeaders(), credentials: 'include' });
     const file = await r.json(); if (!r.ok) return showToast(file.error || 'Lecture impossible.', 'error');
     setGeneratedProject({ files: [{ path: file.path, content: file.content, language: path.split('.').pop() }] });
     showToast(`${file.path} chargé dans le projet.`, '', 3000);
