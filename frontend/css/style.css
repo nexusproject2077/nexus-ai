@@ -5728,3 +5728,33 @@ button,
         padding-right: 10px !important;
     }
 }
+
+
+/* Mobile composer alignment follow-up */
+@media (max-width: 768px) {
+    #input-container {
+        left: 12px !important;
+        right: 12px !important;
+        width: calc(100vw - 24px) !important;
+        max-width: calc(100vw - 24px) !important;
+        box-sizing: border-box !important;
+        transform: none !important;
+    }
+
+    /* Keep the two contextual floating actions visually separated. */
+    #toggle-sidebar-outside {
+        top: calc(12px + env(safe-area-inset-top, 0px)) !important;
+    }
+    #new-chat-collapsed {
+        top: calc(60px + env(safe-area-inset-top, 0px)) !important;
+    }
+}
+
+@media (max-width: 390px) {
+    #input-container {
+        left: 9px !important;
+        right: 9px !important;
+        width: calc(100vw - 18px) !important;
+        max-width: calc(100vw - 18px) !important;
+    }
+}
