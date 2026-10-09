@@ -6201,3 +6201,23 @@ body {
         top: calc(env(safe-area-inset-top, 0px) + 248px) !important;
     }
 }
+
+
+/* Mobile home — move ONLY the “Par où veux-tu commencer ?” + action grid
+   into the lower empty zone requested by the user. */
+@media (max-width: 768px) {
+    .empty-subtitle {
+        top: calc(env(safe-area-inset-top, 0px) + 390px) !important;
+    }
+    .suggestion-grid {
+        top: calc(env(safe-area-inset-top, 0px) + 424px) !important;
+    }
+}
+@media (max-width: 430px) {
+    .empty-subtitle {
+        top: calc(env(safe-area-inset-top, 0px) + 370px) !important;
+    }
+    .suggestion-grid {
+        top: calc(env(safe-area-inset-top, 0px) + 400px) !important;
+    }
+}
