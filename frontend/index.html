@@ -217,11 +217,38 @@
                             </svg>
                         </a>
 
-                        <button id="attach-file-btn" title="Joindre des fichiers">
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
+                        <div class="composer-plus-wrap">
+                            <button id="attach-file-btn" title="Ajouter">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <div id="composer-plus-menu" class="composer-plus-menu hidden" role="menu">
+                                <button type="button" id="plus-upload-btn" class="composer-plus-item">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.05 12.25 20.2a5 5 0 0 1-7.07-7.07l9.19-9.19a3.33 3.33 0 0 1 4.71 4.71l-9.2 9.19a1.67 1.67 0 0 1-2.36-2.36l8.49-8.48"/></svg>
+                                    <span>Joindre un fichier</span>
+                                </button>
+                                <div class="composer-plus-divider"></div>
+                                <div class="composer-plus-section">
+                                    <div class="composer-plus-section-head">
+                                        <span>GitHub</span>
+                                        <small id="github-status">Non connecté</small>
+                                    </div>
+                                    <button type="button" id="github-connect-btn" class="composer-plus-item">
+                                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.57.1.78-.25.78-.55v-1.9c-3.2.7-3.88-1.54-3.88-1.54-.52-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.72-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.26 5.69.41.36.78 1.07.78 2.16v3.2c0 .3.2.66.79.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+                                        <span>Connecter GitHub</span>
+                                    </button>
+                                    <button type="button" id="github-read-btn" class="composer-plus-item" disabled>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/></svg>
+                                        <span>Lire un dépôt</span>
+                                    </button>
+                                    <button type="button" id="github-push-btn" class="composer-plus-item" disabled>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>
+                                        <span>Créer le commit</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="model-selector" id="model-selector">
@@ -268,12 +295,6 @@
                         <div class="preview-toolbar"><span>Aperçu isolé HTML/CSS/JS</span><div><button type="button" id="preview-reload-btn">Recharger</button><button type="button" id="preview-expand-btn">Ouvrir en grand</button></div></div>
                         <iframe id="project-preview" title="Aperçu du projet" sandbox="allow-scripts allow-modals" referrerpolicy="no-referrer"></iframe>
                         <pre class="preview-errors hidden" id="preview-errors" aria-live="polite"></pre>
-                    </div>
-                    <div class="github-panel" id="github-panel">
-                        <div><strong>GitHub</strong><span id="github-status">Non connecté</span></div>
-                        <button type="button" id="github-connect-btn">Connecter GitHub</button>
-                        <button type="button" id="github-read-btn">Lire un fichier</button>
-                        <button type="button" id="github-push-btn" disabled>Créer le commit</button>
                     </div>
                 </section>
             </div>
