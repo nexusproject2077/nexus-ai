@@ -1144,21 +1144,26 @@ async function typeWriter(element, text, isHTML) {
         if (speed === 0) {
             element.innerHTML = html;
         } else {
-            const temp = document.createElement('div');
-            temp.innerHTML = html;
-            const plain = temp.textContent;
-            const tokens = plain.match(/\S+|\s+/g) || [];
+            // Animate the original Markdown, not text extracted from rendered HTML.
+            // Otherwise formatting markers disappear until the final repaint.
+            const tokens = text.match(/\S+|\s+/g) || [];
             let buf = '';
             for (const token of tokens) {
                 if (stopRequested) break;
                 buf += token;
                 if (token.trim()) {
-                    element.innerHTML = markdownToHTML(buf);
+                    // Temporarily close an unfinished fenced code block for the
+                    // preview, without altering the source response or saved text.
+                    const fences = buf.match(/```/g) || [];
+                    const preview = fences.length % 2
+                        ? buf + (buf.endsWith('\n') ? '' : '\n') + '\n```'
+                        : buf;
+                    element.innerHTML = markdownToHTML(preview);
                     chatBox.scrollTop = chatBox.scrollHeight;
                     await new Promise(r => setTimeout(r, speed));
                 }
             }
-            element.innerHTML = html;
+            if (!stopRequested) element.innerHTML = html;
         }
     } else {
         if (speed === 0) {
