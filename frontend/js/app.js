@@ -1602,7 +1602,7 @@ function generateRandomCode() {
 // ===== SYSTEM PROMPT BUILDER =====
 function buildSystemPrompt() {
     const s = loadSettings();
-    let prompt = "Tu es Nexus AI, un assistant IA intelligent, sympa et utile cree par l'entreprise Nexus. Tu reponds en francais.";
+    let prompt = "Tu es Nexus AI, un assistant IA intelligent, sympa et utile cree par l'entreprise Nexus. Tu reponds en francais. Regle de style obligatoire : n'utilise jamais le tiret cadratin (U+2014) pour ponctuer ou separer des propositions dans tes reponses. Privilegie les points, les virgules, les deux-points et les parentheses selon le sens. Ne modifie pas le code, les commandes, les URLs ou les citations litterales pour appliquer cette regle.";
     if (s.alias) prompt += ` L'utilisateur s'appelle ${s.alias}.`;
     if (s.profession) prompt += ` Sa profession est : ${s.profession}.`;
     if (s.about) prompt += ` Informations sur l'utilisateur : ${s.about}.`;
@@ -1809,6 +1809,17 @@ async function getGroqAIResponse(message, searchContext = null) {
     }
 }
 
+// Keep French prose free of em-dash separators without corrupting code or URLs.
+// Fenced and inline code, URLs and quoted text are preserved verbatim.
+function normalizeFrenchProsePunctuation(text) {
+    return String(text || '').split(/(```[\s\S]*?```|`[^`\n]*`|https?:\/\/[^\s<>]+|“[^”]*”|«[^»]*»)/g)
+        .map((part, index) => index % 2 === 1 ? part : part.replace(/\s*—\s*/g, (match) => {
+            if (!match.trim()) return match;
+            return match.startsWith(' ') || match.endsWith(' ') ? ', ' : ' : ';
+        }))
+        .join('');
+}
+
 // ===== GESTION MESSAGES =====
 async function handleMessage() {
     const message = userInput.value.trim();
@@ -1871,7 +1882,7 @@ async function handleMessage() {
         const aiResponse = await getGroqAIResponse(message || 'Analyse ces fichiers', searchContext);
         hideTypingIndicator();
         if (aiResponse) {
-            await addMessage('bot-message', aiResponse, true, true);
+            await addMessage('bot-message', normalizeFrenchProsePunctuation(aiResponse), true, true);
             if (searchSources.length > 0) showWebSources(searchSources);
         }
         sendButton.disabled = false;
