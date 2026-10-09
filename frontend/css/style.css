@@ -6113,3 +6113,33 @@ button,
         top: calc(env(safe-area-inset-top, 0px) + 248px) !important;
     }
 }
+
+
+/* Global fixed backdrop — page content may scroll, background never does */
+html,
+body {
+    background: #08090f !important;
+}
+
+body::before,
+body::after,
+.aurora-orb {
+    position: fixed !important;
+    transform: translateZ(0);
+    will-change: auto !important;
+}
+
+/* Keep the visual backdrop pinned to the viewport on every screen/page.
+   Only foreground containers own scrolling. */
+body {
+    background-attachment: fixed !important;
+}
+
+#chat-page,
+#auth-page {
+    background: transparent !important;
+}
+
+#main-content {
+    background: transparent !important;
+}
