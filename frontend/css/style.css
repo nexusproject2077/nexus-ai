@@ -6365,3 +6365,26 @@ body::after,
         overscroll-behavior-y: contain;
     }
 }
+
+
+/* Freeze the conversation behind the mobile sidebar; the sidebar list itself
+   remains independently scrollable. */
+@media (max-width: 768px) {
+    #chat-page:has(#sidebar:not(.hidden)) #main-content,
+    #chat-page:has(#sidebar:not(.hidden)) #chat-box {
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        touch-action: none !important;
+    }
+
+    #sidebar-backdrop.visible {
+        touch-action: none !important;
+        overscroll-behavior: none !important;
+    }
+
+    #sidebar:not(.hidden) .conversations-list {
+        overflow-y: auto !important;
+        overscroll-behavior-y: contain !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
