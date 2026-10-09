@@ -2276,7 +2276,7 @@ function showSettingsCategoryIndex() {
     const heading = id('settings-page-header-title');
     const backLabel = id('settings-back-label');
     if (heading) heading.textContent = 'Paramètres';
-    if (backLabel) backLabel.textContent = 'Retour au chat';
+    if (backLabel) backLabel.textContent = 'Retour';
 }
 
 window.openSettings = function() {
@@ -2351,7 +2351,7 @@ window.switchSettingsTab = function(tab) {
     const heading = id('settings-page-header-title');
     const backLabel = id('settings-back-label');
     if (heading) heading.textContent = isMobile() ? settingsTabTitles[tab] : 'Paramètres';
-    if (backLabel) backLabel.textContent = isMobile() ? 'Paramètres' : 'Retour au chat';
+    if (backLabel) backLabel.textContent = isMobile() ? 'Paramètres' : 'Retour';
     const content = document.querySelector('.settings-content');
     if (content) content.scrollTop = 0;
 };
