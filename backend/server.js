@@ -101,10 +101,60 @@ function githubCookieOptions(maxAge = 0) {
   return { httpOnly: true, secure: true, sameSite: 'none', path: '/', ...(maxAge ? { maxAge } : {}) };
 }
 
+function sealGithubSession(githubToken, userId) {
+  const key = crypto.createHash('sha256').update(GITHUB_COOKIE_SECRET).digest();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const payload = Buffer.from(JSON.stringify({
+    githubToken,
+    userId: String(userId || ''),
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  }), 'utf8');
+  const encrypted = Buffer.concat([cipher.update(payload), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [iv, tag, encrypted].map(part => part.toString('base64url')).join('.');
+}
+
+function openGithubSession(value) {
+  try {
+    const [ivPart, tagPart, dataPart] = String(value || '').split('.');
+    if (!ivPart || !tagPart || !dataPart) return null;
+    const key = crypto.createHash('sha256').update(GITHUB_COOKIE_SECRET).digest();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivPart, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tagPart, 'base64url'));
+    const clear = Buffer.concat([
+      decipher.update(Buffer.from(dataPart, 'base64url')),
+      decipher.final(),
+    ]);
+    const payload = JSON.parse(clear.toString('utf8'));
+    if (!payload.githubToken || !payload.userId || !payload.exp || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 function githubTokenFromRequest(req) {
+  // Safari/iOS blocks third-party cookies between Firebase Hosting and Vercel.
+  // Prefer an opaque encrypted session header, while keeping the HttpOnly
+  // cookie as a compatibility fallback for browsers that allow it.
+  const headerSession = req.headers['x-github-session'];
+  if (typeof headerSession === 'string' && headerSession) {
+    const payload = openGithubSession(headerSession);
+    if (payload && (!req.user || String(payload.userId) === String(req.user.id))) {
+      return payload.githubToken;
+    }
+  }
+
   const raw = parseCookies(req).nexus_github;
   if (!raw) return null;
-  try { return jwt.verify(raw, GITHUB_COOKIE_SECRET).githubToken || null; } catch { return null; }
+  try {
+    const payload = jwt.verify(raw, GITHUB_COOKIE_SECRET);
+    if (payload.userId && req.user && String(payload.userId) !== String(req.user.id)) return null;
+    return payload.githubToken || null;
+  } catch {
+    return null;
+  }
 }
 
 function safePath(value) {
@@ -384,7 +434,6 @@ app.get('/github/connect', auth, (req, res) => {
     return res.status(501).json({ error: 'GitHub OAuth n’est pas configuré sur le serveur.' });
   }
   const state = jwt.sign({ userId: req.user.id, nonce: crypto.randomUUID() }, GITHUB_COOKIE_SECRET, { expiresIn: '10m' });
-  res.cookie('nexus_github_state', state, githubCookieOptions(10 * 60 * 1000));
   const url = new URL('https://github.com/login/oauth/authorize');
   url.searchParams.set('client_id', GITHUB_CLIENT_ID);
   url.searchParams.set('redirect_uri', GITHUB_REDIRECT_URI);
@@ -395,23 +444,32 @@ app.get('/github/connect', auth, (req, res) => {
 
 app.get('/github/callback', ah(async (req, res) => {
   const { code, state } = req.query;
-  const stateCookie = parseCookies(req).nexus_github_state;
-  if (!code || !state || state !== stateCookie) return res.redirect(`${FRONTEND_ORIGIN}/?github=failed`);
+  if (!code || !state) return res.redirect(`${FRONTEND_ORIGIN}/#github=failed`);
   try {
-    jwt.verify(state, GITHUB_COOKIE_SECRET);
+    const statePayload = jwt.verify(state, GITHUB_COOKIE_SECRET);
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ client_id: GITHUB_CLIENT_ID, client_secret: GITHUB_CLIENT_SECRET, code, redirect_uri: GITHUB_REDIRECT_URI }),
     });
     const tokenData = await tokenResponse.json();
     if (!tokenResponse.ok || !tokenData.access_token) throw new Error(tokenData.error_description || 'Autorisation GitHub refusée.');
-    const session = jwt.sign({ githubToken: tokenData.access_token }, GITHUB_COOKIE_SECRET, { expiresIn: '7d' });
-    res.cookie('nexus_github', session, githubCookieOptions(7 * 24 * 60 * 60 * 1000));
-    res.clearCookie('nexus_github_state', githubCookieOptions());
-    res.redirect(`${FRONTEND_ORIGIN}/?github=connected`);
+
+    const cookieSession = jwt.sign(
+      { githubToken: tokenData.access_token, userId: String(statePayload.userId || '') },
+      GITHUB_COOKIE_SECRET,
+      { expiresIn: '7d' }
+    );
+    const browserSession = sealGithubSession(tokenData.access_token, statePayload.userId);
+
+    // Keep the HttpOnly cookie for browsers where cross-site cookies work,
+    // and also return an encrypted opaque session through the URL fragment.
+    // The fragment is never sent to Firebase or Vercel and the frontend removes
+    // it immediately after storing it in sessionStorage.
+    res.cookie('nexus_github', cookieSession, githubCookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.redirect(`${FRONTEND_ORIGIN}/#github_session=${encodeURIComponent(browserSession)}`);
   } catch (error) {
     console.error('GitHub OAuth callback:', error.message);
-    res.redirect(`${FRONTEND_ORIGIN}/?github=failed`);
+    res.redirect(`${FRONTEND_ORIGIN}/#github=failed`);
   }
 }));
 
