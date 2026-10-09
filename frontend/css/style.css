@@ -6231,13 +6231,13 @@ body {
     flex: 0 0 auto;
     overflow: visible;
     fill: none;
-    stroke: #59b8ff;
+    stroke: rgba(255,255,255,.94);
     stroke-width: 3.6;
     stroke-linecap: round;
     stroke-linejoin: round;
-    filter: drop-shadow(0 0 14px rgba(59, 156, 255, .16));
+    filter: none;
 }
-.jeran-logo .j2 { stroke: #8ca6ff; }
+.jeran-logo .j2 { stroke: rgba(255,255,255,.38); }
 
 @media (max-width: 768px) {
     .empty-state .jeran-logo {
