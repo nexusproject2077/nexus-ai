@@ -6388,3 +6388,252 @@ body::after,
         -webkit-overflow-scrolling: touch;
     }
 }
+
+
+/* =====================================================================
+   NEXUS SETTINGS — dedicated full-screen page, never a modal or sheet.
+   Existing setting controls keep their IDs, events and persistence.
+   ===================================================================== */
+body.settings-page-open { overflow: hidden !important; }
+
+#settings-overlay.settings-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    z-index: 5000 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #101115 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+    overscroll-behavior: none !important;
+}
+#settings-overlay.settings-overlay.hidden { display: none !important; }
+
+.settings-page-header {
+    width: 100%;
+    height: 76px;
+    min-height: 76px;
+    box-sizing: border-box;
+    padding: 0 max(24px, calc((100vw - 1120px) / 2));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
+    background: #15161b;
+    flex: 0 0 auto;
+    position: relative;
+}
+.settings-page-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,.055);
+    color: rgba(255,255,255,.82);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .2s ease;
+}
+.settings-page-back:hover { background: rgba(255,255,255,.12); }
+.settings-page-back svg { width: 17px; height: 17px; flex-shrink: 0; }
+.settings-page-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--font-display);
+    font-size: 19px;
+    letter-spacing: -.045em;
+    color: #f5f5f7;
+}
+.settings-page-brand span { color: #777780; }
+.settings-page-header-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,.56);
+    min-width: 110px;
+    text-align: right;
+}
+#settings-modal.settings-modal {
+    display: flex !important;
+    flex-direction: row !important;
+    flex: 1 1 auto !important;
+    align-self: center !important;
+    width: 100% !important;
+    max-width: 1120px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    overflow: hidden !important;
+    animation: none !important;
+}
+#settings-modal > .settings-close { display: none !important; }
+#settings-modal > .settings-nav {
+    width: 262px !important;
+    min-width: 262px !important;
+    max-width: 262px !important;
+    max-height: none !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    gap: 3px !important;
+    padding: 26px 12px 40px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    background: #14151a !important;
+    border-right: 1px solid rgba(255,255,255,.065) !important;
+    border-bottom: 0 !important;
+    overscroll-behavior: contain;
+}
+.settings-nav-group-label {
+    margin: 19px 12px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: rgba(255,255,255,.36);
+}
+.settings-nav-group-label:first-child { margin-top: 0; }
+#settings-modal .settings-nav-item {
+    width: 100%;
+    min-height: 43px;
+    flex: 0 0 auto;
+    border: 0 !important;
+    border-radius: 12px !important;
+    padding: 10px 13px !important;
+    display: flex !important;
+    gap: 12px;
+    font-size: 13px;
+    color: rgba(255,255,255,.68);
+    white-space: normal;
+}
+#settings-modal .settings-nav-item svg {
+    display: block !important;
+    width: 17px;
+    height: 17px;
+}
+#settings-modal .settings-nav-item.active {
+    color: #f4f5f7 !important;
+    background: rgba(10,132,255,.19) !important;
+}
+#settings-modal > .settings-content {
+    display: block;
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+    height: 100%;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    padding: 0 !important;
+    background: #101115;
+}
+#settings-modal .settings-panel {
+    max-width: 800px;
+    box-sizing: border-box;
+    padding: 42px 42px 90px !important;
+    margin: 0 auto;
+    overflow: visible !important;
+    animation: none !important;
+}
+#settings-modal .settings-title {
+    font-size: clamp(24px, 3vw, 30px);
+    letter-spacing: -.035em;
+    margin-bottom: 22px;
+}
+#settings-modal .settings-row {
+    min-height: 62px;
+}
+@media (max-width: 768px) {
+    .settings-page-header {
+        height: calc(66px + env(safe-area-inset-top, 0px));
+        min-height: calc(66px + env(safe-area-inset-top, 0px));
+        padding: env(safe-area-inset-top, 0px) 16px 0;
+    }
+    .settings-page-back { padding: 9px 6px; background: transparent; font-size: 14px; }
+    .settings-page-brand { font-size: 17px; }
+    .settings-page-header-title {
+        font-size: 13px;
+        min-width: 0;
+        max-width: 120px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #settings-modal.settings-modal {
+        flex-direction: column !important;
+        width: 100% !important;
+        max-width: none !important;
+    }
+    #settings-modal > .settings-nav {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        padding: 17px 16px calc(32px + env(safe-area-inset-bottom, 0px)) !important;
+        background: #101115 !important;
+        border: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+    #settings-modal .settings-nav-group-label {
+        margin: 21px 11px 8px;
+        font-size: 11px;
+    }
+    #settings-modal .settings-nav-item {
+        min-height: 55px !important;
+        padding: 14px 15px !important;
+        font-size: 15px !important;
+        border-radius: 14px !important;
+        background: #1c1d23;
+        color: rgba(255,255,255,.88);
+    }
+    #settings-modal .settings-nav-item svg {
+        width: 20px !important;
+        height: 20px !important;
+    }
+    #settings-modal > .settings-content {
+        display: none !important;
+        width: 100% !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        height: auto !important;
+    }
+    #settings-overlay.settings-detail-open #settings-modal > .settings-nav {
+        display: none !important;
+    }
+    #settings-overlay.settings-detail-open #settings-modal > .settings-content {
+        display: block !important;
+    }
+    #settings-modal .settings-panel {
+        padding: 24px 18px calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+        max-width: 640px;
+    }
+    #settings-modal .settings-title { font-size: 25px; margin-bottom: 16px; }
+    #settings-modal .settings-row { gap: 14px; }
+}
