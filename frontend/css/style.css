@@ -6258,3 +6258,34 @@ body {
         height: 148px !important;
     }
 }
+
+
+/* Jeran reveal: finish upper white chevron before drawing lower gray one. */
+.jeran-logo {
+    animation: jeran-glow 3s ease-in-out 2.4s infinite;
+}
+.jeran-logo path {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+}
+.jeran-logo .j1 {
+    animation: jeran-draw 1.2s ease-in-out 0s 1 forwards;
+}
+.jeran-logo .j2 {
+    animation: jeran-draw 1.2s ease-in-out 1.2s 1 forwards;
+}
+
+@keyframes jeran-draw {
+    to { stroke-dashoffset: 0; }
+}
+@keyframes jeran-glow {
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(99,102,241,.35)); }
+    50% { filter: drop-shadow(0 0 8px rgba(139,92,246,.75)); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .jeran-logo { animation: none !important; }
+    .jeran-logo path {
+        stroke-dashoffset: 0 !important;
+        animation: none !important;
+    }
+}
