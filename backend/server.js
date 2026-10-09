@@ -731,6 +731,110 @@ app.post('/chat', auth, ah(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------
+//  TRUSTED CONTACT: explicit invitation + acceptance, not automated alerts.
+//  A signed, single-use consent link is shared by the account owner.
+//  The app does NOT infer mental health emergencies or alert contacts.
+// ---------------------------------------------------------------
+function trustedContactPublic(contact) {
+  if (!contact) return null;
+  return {
+    name: contact.name || '',
+    email: contact.email || '',
+    status: contact.status === 'accepted' ? 'accepted' : 'pending',
+    invitedAt: contact.invitedAt || null,
+    acceptedAt: contact.acceptedAt || null,
+    expiresAt: contact.expiresAt || null,
+  };
+}
+
+app.get('/user/trusted-contact', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  res.json({ contact: trustedContactPublic(user.settings?.trustedContact) });
+}));
+
+app.post('/user/trusted-contact/invite', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  const name = String(req.body?.name || '').trim();
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!name || name.length > 100 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+    return res.status(400).json({ error: 'Saisis un nom et une adresse e-mail valides.' });
+  }
+  if (email === String(user.email || '').trim().toLowerCase()) {
+    return res.status(400).json({ error: 'Choisis une autre personne que toi-même.' });
+  }
+  const nonce = crypto.randomBytes(32).toString('hex');
+  const token = jwt.sign({ purpose: 'trusted-contact-consent', uid: String(user.id), nonce }, JWT_SECRET, { expiresIn: '7d' });
+  const now = new Date();
+  const contact = {
+    name, email, status: 'pending',
+    nonceHash: crypto.createHash('sha256').update(nonce).digest('hex'),
+    invitedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 7 * 86400000).toISOString(),
+  };
+  user.settings = { ...(user.settings || {}), trustedContact: contact };
+  await store.usersSave(user);
+  const url = `${req.protocol}://${req.get('host')}/trusted-contact/accept?token=${encodeURIComponent(token)}`;
+  // Delivery is intentionally user-initiated until a verified mail provider
+  // is configured. Never claim that an invitation was emailed automatically.
+  res.json({ contact: trustedContactPublic(contact), inviteUrl: url });
+}));
+
+app.delete('/user/trusted-contact', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  const settings = { ...(user.settings || {}) };
+  delete settings.trustedContact;
+  user.settings = settings;
+  await store.usersSave(user);
+  res.json({ ok: true });
+}));
+
+function consentHTML(title, message, token = '') {
+  const escape = v => String(v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>${escape(title)} | Nexus AI</title><style>body{font-family:system-ui,-apple-system,sans-serif;background:#101115;color:#f5f5f7;min-height:100vh;display:grid;place-items:center;margin:0;padding:20px;box-sizing:border-box}.card{width:min(100%,480px);padding:32px;border:1px solid #34343a;border-radius:24px;background:#1c1d23}h1{font-size:25px}p{color:#c2c2ca;line-height:1.65}button{background:#0a84ff;border:0;border-radius:12px;color:white;padding:14px 18px;font-size:16px;font-weight:600;cursor:pointer}</style></head><body><main class="card"><h1>${escape(title)}</h1><p>${escape(message)}</p>${token ? `<form method="post" action="/trusted-contact/accept"><input type="hidden" name="token" value="${escape(token)}"><button type="submit">J'accepte d'être contact de confiance</button></form><p>Tu peux refuser simplement en fermant cette page. Aucun message de conversation ne sera partagé.</p>` : ''}<p>Ce dispositif n'envoie pas encore d'alertes automatiques et ne remplace pas les services d'urgence.</p></main></body></html>`;
+}
+
+function validateConsentToken(token) {
+  try {
+    const payload = jwt.verify(String(token || ''), JWT_SECRET);
+    if (payload.purpose !== 'trusted-contact-consent' || !payload.uid || !payload.nonce) return null;
+    return payload;
+  } catch { return null; }
+}
+
+app.get('/trusted-contact/accept', ah(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  const payload = validateConsentToken(req.query.token);
+  if (!payload) return res.status(400).send(consentHTML('Invitation expirée', 'Ce lien est invalide ou a expiré.'));
+  const user = await store.usersGetById(payload.uid);
+  const contact = user?.settings?.trustedContact;
+  const expected = crypto.createHash('sha256').update(payload.nonce).digest('hex');
+  if (!contact || contact.status !== 'pending' || contact.nonceHash !== expected || new Date(contact.expiresAt) < new Date()) {
+    return res.status(400).send(consentHTML('Invitation indisponible', 'Ce lien a déjà été utilisé ou révoqué.'));
+  }
+  res.send(consentHTML('Invitation de contact de confiance', `Une personne souhaite te désigner comme contact de confiance sur Nexus AI. Ton accord est indispensable. Contact concerné : ${contact.email}. Aucun système d'alerte automatique n'est actuellement actif.`, String(req.query.token)));
+}));
+
+app.post('/trusted-contact/accept', express.urlencoded({ extended: false, limit: '4kb' }), ah(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  const payload = validateConsentToken(req.body?.token);
+  if (!payload) return res.status(400).send(consentHTML('Invitation expirée', 'Ce lien est invalide ou a expiré.'));
+  const user = await store.usersGetById(payload.uid);
+  const contact = user?.settings?.trustedContact;
+  const expected = crypto.createHash('sha256').update(payload.nonce).digest('hex');
+  if (!contact || contact.status !== 'pending' || contact.nonceHash !== expected || new Date(contact.expiresAt) < new Date()) {
+    return res.status(400).send(consentHTML('Invitation indisponible', 'Ce lien a déjà été utilisé ou révoqué.'));
+  }
+  user.settings = { ...user.settings, trustedContact: { ...contact, status: 'accepted', acceptedAt: new Date().toISOString(), nonceHash: '' } };
+  await store.usersSave(user);
+  res.send(consentHTML('Contact accepté', 'Ton accord a bien été enregistré. Tu peux fermer cette page. Nexus AI ne surveille pas les conversations pour déclencher des alertes automatiques.'));
+}));
+
+// ---------------------------------------------------------------
 //  USER SETTINGS + PHONE + MEMORY
 // ---------------------------------------------------------------
 app.get('/user/settings', auth, ah(async (req, res) => {
@@ -755,7 +859,11 @@ app.put('/user/settings', auth, ah(async (req, res) => {
   const user = await loadCurrentUser(req, res);
   if (!user) return;
   const { settings, sidebarState } = req.body || {};
-  if (settings !== undefined) user.settings = settings;
+  if (settings !== undefined) {
+    const safe = settings && typeof settings === 'object' && !Array.isArray(settings) ? { ...settings } : {};
+    delete safe.trustedContact;
+    user.settings = { ...safe, ...(user.settings?.trustedContact ? { trustedContact: user.settings.trustedContact } : {}) };
+  }
   if (sidebarState !== undefined) user.sidebarState = sidebarState;
   await store.usersSave(user);
   res.json({ ok: true });
