@@ -6312,3 +6312,56 @@ body {
         display: none !important;
     }
 }
+
+
+/* Fixed app canvas: gestures scroll content, never the page or backdrop. */
+body::before,
+body::after,
+.aurora-orb {
+    animation: none !important;
+    position: fixed !important;
+}
+
+@media (max-width: 768px) {
+    html,
+    body {
+        height: 100% !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+    }
+
+    #chat-page:not(.hidden) {
+        height: 100dvh !important;
+        min-height: 0 !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+    }
+
+    #main-content,
+    #sidebar.hidden ~ #main-content {
+        height: 100dvh !important;
+        min-height: 0 !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+    }
+
+    /* Conversations remain scrollable inside the fixed application shell. */
+    #chat-box:not(:has(.empty-state)) {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: 100% !important;
+        overflow-y: auto !important;
+        overscroll-behavior-y: contain !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* Modal content and sidebar retain their own independent scrolling. */
+    #sidebar,
+    .settings-content,
+    .settings-panel,
+    .conversations-list {
+        overscroll-behavior-y: contain;
+    }
+}
