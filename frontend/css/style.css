@@ -5758,3 +5758,43 @@ button,
         max-width: calc(100vw - 18px) !important;
     }
 }
+
+
+/* Fixed provider signature directly above the composer */
+.footer {
+    position: fixed !important;
+    left: 50% !important;
+    bottom: 94px !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    max-width: calc(100vw - 32px) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 990 !important;
+    pointer-events: none !important;
+    white-space: nowrap !important;
+    transition: opacity .16s ease, visibility .16s ease !important;
+}
+.footer.generation-active {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+@media (max-width: 768px) {
+    .footer {
+        bottom: calc(116px + env(safe-area-inset-bottom, 0px)) !important;
+        font-size: .6rem !important;
+    }
+
+    /* Footer no longer consumes document height, so keep only useful
+       breathing room below the final assistant message. */
+    #chat-box {
+        padding-bottom: 20px !important;
+    }
+}
+
+@media (max-width: 390px) {
+    .footer {
+        bottom: calc(114px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
