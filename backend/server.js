@@ -589,10 +589,18 @@ async function callGeminiNative(model, messages, key) {
 app.post('/chat', auth, ah(async (req, res) => {
   const { messages, model, mode } = req.body || {};
   if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages requis.' });
+
+  // Conversation objects persisted in Mongo can carry internal fields such as
+  // _id, id, timestamp, attachments, etc. OpenAI-compatible providers reject
+  // unknown message properties, so only forward the fields their API accepts.
+  const cleanMessages = messages
+    .filter(m => m && ['system', 'user', 'assistant'].includes(m.role))
+    .map(m => ({ role: m.role, content: String(m.content ?? '') }));
+
   const specializedPrompt = codeSystemPrompt(mode);
   const effectiveMessages = specializedPrompt
-    ? [{ role: 'system', content: specializedPrompt }, ...messages]
-    : messages;
+    ? [{ role: 'system', content: specializedPrompt }, ...cleanMessages]
+    : cleanMessages;
 
   const chosenModel = MODEL_PROVIDER[model] ? model : DEFAULT_MODEL;
   const providerName = MODEL_PROVIDER[chosenModel];
