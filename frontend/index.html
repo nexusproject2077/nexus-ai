@@ -76,7 +76,7 @@
                 <div class="auth-field">
                     <label>Téléphone</label>
                     <input type="tel" id="register-phone" placeholder="+33 6 12 34 56 78" autocomplete="tel">
-                    <span class="auth-hint">Enregistré de façon sécurisée sur le serveur · modifiable dans les paramètres.</span>
+                    <span class="auth-hint">Enregistré de façon sécurisée sur le serveur · modifiable dans les réglages.</span>
                 </div>
                 <div class="auth-field">
                     <label>Mot de passe</label>
@@ -153,7 +153,7 @@
             <!-- Avatar utilisateur épinglé en bas -->
             <div class="sidebar-user">
                 <span id="sidebar-username"></span>
-                <button id="settings-btn" onclick="openSettings()" title="Paramètres">
+                <button id="settings-btn" onclick="openSettings()" title="Réglages">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                     </svg>
@@ -309,20 +309,21 @@
         </div>
 
     <!-- ===== DEDICATED SETTINGS PAGE ===== -->
-    <section id="settings-overlay" class="settings-overlay hidden" aria-label="Paramètres">
+    <section id="settings-overlay" class="settings-overlay hidden" aria-label="Réglages">
         <header class="settings-page-header">
             <button class="settings-page-back" type="button" onclick="settingsBack()" aria-label="Retour">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
                 <span id="settings-back-label">Retour</span>
             </button>
             <div class="settings-page-brand"><strong>NEXUS</strong><span>AI</span></div>
-            <span class="settings-page-header-title" id="settings-page-header-title">Paramètres</span>
+            <span class="settings-page-header-title" id="settings-page-header-title">Réglages</span>
         </header>
         <div class="settings-modal" id="settings-modal">
             <button class="settings-close" onclick="closeSettings()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
             <nav class="settings-nav">
+                <h1 class="settings-mobile-title">Réglages</h1>
                 <div class="settings-nav-group-label">Préférences</div>
                 <button class="settings-nav-item active" data-tab="general" onclick="switchSettingsTab('general')">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -981,7 +982,7 @@
                     <div class="settings-shortcut-list">
                         <p class="settings-section-label">Raccourcis clavier</p>
                         <div class="shortcut-item"><span>Nouvelle conversation</span><kbd>Ctrl + N</kbd></div>
-                        <div class="shortcut-item"><span>Ouvrir les paramètres</span><kbd>Ctrl + ,</kbd></div>
+                        <div class="shortcut-item"><span>Ouvrir les réglages</span><kbd>Ctrl + ,</kbd></div>
                         <div class="shortcut-item"><span>Envoyer le message</span><kbd>Entrée</kbd></div>
                         <div class="shortcut-item"><span>Nouvelle ligne</span><kbd>Shift + Entrée</kbd></div>
                         <div class="shortcut-item"><span>Masquer/afficher le menu</span><kbd>Ctrl + B</kbd></div>
@@ -1020,7 +1021,7 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             </div>
             <h2 class="phone-modal-title">Ajoute ton numéro de téléphone</h2>
-            <p class="phone-modal-desc">Il sera <strong>enregistré de façon sécurisée sur le serveur</strong> et tu pourras le modifier à tout moment depuis <strong>Paramètres › Compte</strong>.</p>
+            <p class="phone-modal-desc">Il sera <strong>enregistré de façon sécurisée sur le serveur</strong> et tu pourras le modifier à tout moment depuis <strong>Réglages › Compte</strong>.</p>
             <div class="auth-field">
                 <input type="tel" id="phone-prompt-input" placeholder="+33 6 12 34 56 78" autocomplete="tel">
             </div>
