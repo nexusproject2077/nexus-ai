@@ -922,6 +922,54 @@ h1 {
     flex: 0 0 auto;
 }
 
+.active-github-repo {
+    min-height: 34px;
+    max-width: 180px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    border: 1px solid rgba(124, 92, 255, .32);
+    border-radius: 10px;
+    background: rgba(124, 92, 255, .12);
+    color: rgba(190, 176, 255, .98);
+    box-shadow: inset 0 1px rgba(255,255,255,.07);
+    font: 600 11px/1 var(--font-sans);
+    cursor: pointer;
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.active-github-repo.hidden {
+    display: none;
+}
+
+.active-github-repo:hover {
+    background: rgba(124, 92, 255, .18);
+    border-color: rgba(124, 92, 255, .48);
+    color: #d8d0ff;
+}
+
+.active-github-repo svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+}
+
+.active-github-repo span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .active-github-repo {
+        max-width: 118px;
+        min-height: 32px;
+        padding: 0 8px;
+    }
+}
+
 .composer-plus-menu {
     position: absolute;
     left: 0;
