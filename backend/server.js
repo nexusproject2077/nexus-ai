@@ -758,7 +758,7 @@ app.post('/user/trusted-contact/invite', auth, ah(async (req, res) => {
   if (!user) return;
   const name = String(req.body?.name || '').trim();
   const email = String(req.body?.email || '').trim().toLowerCase();
-  if (!name || name.length > 100 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+  if (!name || name.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ error: 'Saisis un nom et une adresse e-mail valides.' });
   }
   if (email === String(user.email || '').trim().toLowerCase()) {
@@ -775,7 +775,8 @@ app.post('/user/trusted-contact/invite', auth, ah(async (req, res) => {
   };
   user.settings = { ...(user.settings || {}), trustedContact: contact };
   await store.usersSave(user);
-  const url = `${req.protocol}://${req.get('host')}/trusted-contact/accept?token=${encodeURIComponent(token)}`;
+  const apiOrigin = (process.env.PUBLIC_API_ORIGIN || (process.env.VERCEL ? 'https://nexus-ai-api-self.vercel.app' : `${req.protocol}://${req.get('host')}`)).replace(/\/$/, '');
+  const url = `${apiOrigin}/trusted-contact/accept?token=${encodeURIComponent(token)}`;
   // Delivery is intentionally user-initiated until a verified mail provider
   // is configured. Never claim that an invitation was emailed automatically.
   res.json({ contact: trustedContactPublic(contact), inviteUrl: url });
@@ -848,7 +849,8 @@ app.get('/user/settings', auth, ah(async (req, res) => {
 
   res.json({
     user: publicUser(user),
-    settings: user.settings || {},
+    // Consent tokens are server-managed; never expose their hash in the general settings payload.
+    settings: Object.fromEntries(Object.entries(user.settings || {}).filter(([key]) => key !== 'trustedContact')),
     memory: user.memory || [],
     sidebarState: user.sidebarState || 'visible',
     conversations,
