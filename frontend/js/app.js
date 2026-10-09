@@ -153,6 +153,7 @@ function initChatPage() {
         startConversationSync();
     });
     initModelSelector();
+    updateGithubSelectionUI();
 }
 
 // ===== ELEMENTS DOM =====
@@ -1304,6 +1305,28 @@ function githubAuthHeaders() {
     if (session) headers['X-GitHub-Session'] = session;
     return headers;
 }
+function selectedGithubRepo() {
+    return localStorage.getItem('nexus_github_repo') || '';
+}
+function selectedGithubBranch() {
+    return localStorage.getItem('nexus_github_branch') || '';
+}
+function setSelectedGithubRepo(repo, branch) {
+    if (repo) localStorage.setItem('nexus_github_repo', repo);
+    else localStorage.removeItem('nexus_github_repo');
+    if (branch) localStorage.setItem('nexus_github_branch', branch);
+    else localStorage.removeItem('nexus_github_branch');
+    updateGithubSelectionUI();
+}
+function updateGithubSelectionUI() {
+    const readBtn = document.getElementById('github-read-btn');
+    if (!readBtn) return;
+    const label = readBtn.querySelector('span');
+    const repo = selectedGithubRepo();
+    const branch = selectedGithubBranch();
+    if (label) label.textContent = repo ? `Dépôt : ${repo.split('/').pop()}` : 'Sélectionner un dépôt';
+    readBtn.title = repo ? `${repo} · ${branch || 'branche par défaut'}` : 'Sélectionner un dépôt GitHub';
+}
 function consumeGithubOAuthReturn() {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const session = hash.get('github_session');
@@ -1340,6 +1363,8 @@ async function refreshGithubStatus() {
         setGithubConnectLabel(connected);
         const readBtn = document.getElementById('github-read-btn');
         if (readBtn) readBtn.disabled = !connected;
+        if (!connected) setSelectedGithubRepo('', '');
+        updateGithubSelectionUI();
     } catch {
         status.textContent = 'Indisponible';
         setGithubConnectLabel(false);
@@ -1350,11 +1375,11 @@ async function connectGithub() {
     if (button?.dataset.connected === 'true') {
         sessionStorage.removeItem('nexus_github_session');
         sessionStorage.removeItem('nexus_github_return_state');
+        setSelectedGithubRepo('', '');
         await fetch(`${API_BASE}/github/disconnect`, { method: 'POST', headers: authHeaders(), credentials: 'include' });
         return refreshGithubStatus();
     }
 
-    // Keep the exact conversation/mode open after the GitHub round trip.
     await ensureCurrentConversationPersisted();
     const conv = getCurrentConversation();
     sessionStorage.setItem('nexus_github_return_state', JSON.stringify({
@@ -1371,23 +1396,34 @@ async function connectGithub() {
 }
 async function pushGeneratedProject() {
     if (!generatedProject.files.length) return;
-    const reposResponse = await fetch(`${API_BASE}/github/repos`, { headers: githubAuthHeaders(), credentials: 'include' });
-    const repos = await reposResponse.json();
-    if (!reposResponse.ok || !repos.length) return showToast(repos.error || 'Aucun dépôt GitHub accessible.', 'error');
-    const choice = prompt(`Choisis un dépôt :\n${repos.map((r, i) => `${i + 1}. ${r.fullName}${r.private ? ' (privé)' : ''}`).join('\n')}`);
-    const selected = repos[Number(choice) - 1]; if (!selected) return;
-    const repo = selected.fullName;
+    const repo = selectedGithubRepo();
+    let branch = selectedGithubBranch();
+    if (!repo) {
+        showToast('Sélectionne d’abord un dépôt GitHub.', 'error', 3500);
+        return readGithubRepository();
+    }
+
     const [owner, name] = repo.split('/');
-    const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: githubAuthHeaders(), credentials: 'include' });
-    const branches = await branchesResponse.json();
-    if (!branchesResponse.ok || !branches.length) return showToast(branches.error || 'Branches indisponibles.', 'error');
-    const branchChoice = prompt(`Choisis une branche :\n${branches.map((b, i) => `${i + 1}. ${b.name}`).join('\n')}`, String(Math.max(1, branches.findIndex(b => b.name === selected.defaultBranch) + 1)));
-    const branch = branches[Number(branchChoice) - 1]?.name; if (!branch) return;
-    const message = prompt('Message de commit :', 'Create files from Nexus AI'); if (!message) return;
+    if (!branch) {
+        const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: githubAuthHeaders(), credentials: 'include' });
+        const branches = await branchesResponse.json();
+        if (!branchesResponse.ok || !branches.length) return showToast(branches.error || 'Branches indisponibles.', 'error');
+        branch = branches[0].name;
+        localStorage.setItem('nexus_github_branch', branch);
+    }
+
+    const message = prompt('Message de commit :', 'Update from Nexus AI');
+    if (!message) return;
     if (!confirm(`Créer ou mettre à jour ${generatedProject.files.length} fichier(s) sur ${repo}/${branch} ?`)) return;
-    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/commit`, { method: 'POST', headers: githubAuthHeaders(), credentials: 'include', body: JSON.stringify({ branch, message, files: generatedProject.files, confirm: true }) });
+
+    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/commit`, {
+        method: 'POST',
+        headers: githubAuthHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ branch, message, files: generatedProject.files, confirm: true })
+    });
     const d = await r.json();
-    showToast(r.ok ? `Commit créé : ${d.results.length} fichier(s).` : (d.error || 'Commit impossible.'), r.ok ? '' : 'error', 4000);
+    showToast(r.ok ? `Commit créé : ${d.results.length} fichier(s) sur ${repo}.` : (d.error || 'Commit impossible.'), r.ok ? '' : 'error', 4000);
 }
 function escapeGithubHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
@@ -1397,16 +1433,15 @@ function closeGithubRepoBrowser() {
 }
 async function readGithubRepository() {
     closeComposerPlusMenu();
-    let overlay = document.getElementById('github-repo-overlay');
-    if (overlay) overlay.remove();
+    document.getElementById('github-repo-overlay')?.remove();
 
-    overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.id = 'github-repo-overlay';
     overlay.className = 'github-repo-overlay';
     overlay.innerHTML = `
-        <div class="github-repo-modal" role="dialog" aria-modal="true" aria-label="Lire un dépôt GitHub">
+        <div class="github-repo-modal" role="dialog" aria-modal="true" aria-label="Sélectionner un dépôt GitHub">
             <div class="github-repo-header">
-                <div><strong>Lire un dépôt</strong><span>Choisis un dépôt GitHub accessible à Nexus AI</span></div>
+                <div><strong>Sélectionner un dépôt</strong><span>Nexus AI travaillera directement dans ce dépôt.</span></div>
                 <button type="button" class="github-repo-close" aria-label="Fermer">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </button>
@@ -1435,6 +1470,7 @@ function renderGithubRepoList(repos) {
     const search = document.getElementById('github-repo-search');
     if (!content) return;
 
+    const current = selectedGithubRepo();
     const render = (query = '') => {
         const q = query.trim().toLowerCase();
         const filtered = repos.filter(repo => !q || repo.fullName.toLowerCase().includes(q));
@@ -1443,91 +1479,71 @@ function renderGithubRepoList(repos) {
             return;
         }
         content.innerHTML = filtered.map(repo => `
-            <button type="button" class="github-repo-card" data-repo="${escapeGithubHTML(repo.fullName)}" data-default-branch="${escapeGithubHTML(repo.defaultBranch || 'main')}">
+            <button type="button" class="github-repo-card ${repo.fullName === current ? 'selected' : ''}" data-repo="${escapeGithubHTML(repo.fullName)}" data-default-branch="${escapeGithubHTML(repo.defaultBranch || 'main')}">
                 <span class="github-repo-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/></svg></span>
-                <span class="github-repo-card-copy"><strong>${escapeGithubHTML(repo.fullName)}</strong><small>${repo.private ? 'Privé' : 'Public'} · ${escapeGithubHTML(repo.defaultBranch || 'main')}</small></span>
+                <span class="github-repo-card-copy"><strong>${escapeGithubHTML(repo.fullName)}</strong><small>${repo.private ? 'Privé' : 'Public'} · branche ${escapeGithubHTML(repo.defaultBranch || 'main')}</small></span>
                 <svg class="github-repo-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
             </button>
         `).join('');
         content.querySelectorAll('.github-repo-card').forEach(button => {
-            button.onclick = () => loadGithubRepository(button.dataset.repo, button.dataset.defaultBranch);
+            button.onclick = () => selectGithubRepository(button.dataset.repo, button.dataset.defaultBranch);
         });
     };
     render();
     if (search) search.oninput = () => render(search.value);
 }
-async function loadGithubRepository(repo, defaultBranch = 'main') {
-    const content = document.getElementById('github-repo-content');
-    if (!content) return;
-    content.innerHTML = '<div class="github-browser-loading">Chargement du dépôt…</div>';
-
-    const [owner, name] = repo.split('/');
-    try {
-        const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: githubAuthHeaders(), credentials: 'include' });
-        const branches = await branchesResponse.json();
-        if (!branchesResponse.ok) throw new Error(branches.error || 'Branches indisponibles.');
-        const selectedBranch = branches.some(b => b.name === defaultBranch) ? defaultBranch : (branches[0]?.name || defaultBranch);
-
-        content.innerHTML = `
-            <div class="github-browser-nav">
-                <button type="button" id="github-browser-back">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
-                    Dépôts
-                </button>
-                <div><strong>${escapeGithubHTML(repo)}</strong><span>Parcourir les fichiers</span></div>
-                <select id="github-branch-select">${branches.map(b => `<option value="${escapeGithubHTML(b.name)}"${b.name === selectedBranch ? ' selected' : ''}>${escapeGithubHTML(b.name)}</option>`).join('')}</select>
-            </div>
-            <input id="github-file-search" class="github-file-search" type="search" placeholder="Rechercher un fichier…" autocomplete="off">
-            <div id="github-file-list" class="github-file-list"><div class="github-browser-loading">Chargement des fichiers…</div></div>
-        `;
-        document.getElementById('github-browser-back').onclick = readGithubRepository;
-        document.getElementById('github-branch-select').onchange = e => loadGithubTree(repo, e.target.value);
-        await loadGithubTree(repo, selectedBranch);
-    } catch (error) {
-        content.innerHTML = `<div class="github-browser-empty">${escapeGithubHTML(error.message)}</div>`;
-    }
-}
-async function loadGithubTree(repo, branch) {
-    const list = document.getElementById('github-file-list');
-    if (!list) return;
-    list.innerHTML = '<div class="github-browser-loading">Chargement des fichiers…</div>';
-    const [owner, name] = repo.split('/');
-
-    try {
-        const response = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/tree?ref=${encodeURIComponent(branch)}`, { headers: githubAuthHeaders(), credentials: 'include' });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Arborescence indisponible.');
-        const files = data.files || [];
-        const search = document.getElementById('github-file-search');
-
-        const render = (query = '') => {
-            const q = query.trim().toLowerCase();
-            const filtered = files.filter(file => !q || file.path.toLowerCase().includes(q)).slice(0, 400);
-            list.innerHTML = filtered.length ? filtered.map(file => `
-                <button type="button" class="github-file-row" data-path="${escapeGithubHTML(file.path)}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
-                    <span>${escapeGithubHTML(file.path)}</span>
-                    <small>${file.size ? fileSizeText(' '.repeat(Math.min(file.size, 100000))) : ''}</small>
-                </button>
-            `).join('') : '<div class="github-browser-empty">Aucun fichier trouvé.</div>';
-            list.querySelectorAll('.github-file-row').forEach(button => {
-                button.onclick = () => openGithubFile(repo, branch, button.dataset.path);
-            });
-        };
-        render();
-        if (search) search.oninput = () => render(search.value);
-    } catch (error) {
-        list.innerHTML = `<div class="github-browser-empty">${escapeGithubHTML(error.message)}</div>`;
-    }
-}
-async function openGithubFile(repo, branch, path) {
-    const [owner, name] = repo.split('/');
-    const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/file?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(branch)}`, { headers: githubAuthHeaders(), credentials: 'include' });
-    const file = await r.json();
-    if (!r.ok) return showToast(file.error || 'Lecture impossible.', 'error');
-    setGeneratedProject({ files: [{ path: file.path, content: file.content, language: path.split('.').pop() }] });
+function selectGithubRepository(repo, branch = 'main') {
+    setSelectedGithubRepo(repo, branch);
     closeGithubRepoBrowser();
-    showToast(`${file.path} chargé depuis ${repo}.`, '', 3000);
+    showToast(`Dépôt actif : ${repo} · ${branch}`, '', 3000);
+}
+async function buildGithubRepoContext(message) {
+    const repo = selectedGithubRepo();
+    const branch = selectedGithubBranch();
+    const conv = getCurrentConversation();
+    if (!repo || !branch || conv?.assistantMode !== 'code') return '';
+
+    const [owner, name] = repo.split('/');
+    try {
+        const treeResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/tree?ref=${encodeURIComponent(branch)}`, { headers: githubAuthHeaders(), credentials: 'include' });
+        const treeData = await treeResponse.json();
+        if (!treeResponse.ok) return '';
+
+        const files = (treeData.files || []).filter(f => {
+            const p = String(f.path || '').toLowerCase();
+            return !/(^|\/)(node_modules|dist|build|vendor|\.git)\//.test(p)
+                && /\.(js|mjs|cjs|ts|tsx|jsx|html|css|scss|json|md|py|php|java|yml|yaml|toml|env\.example)$/i.test(p);
+        });
+
+        const words = String(message || '').toLowerCase().match(/[a-z0-9_.-]{4,}/g) || [];
+        const scored = files.map(file => {
+            const path = file.path.toLowerCase();
+            let score = 0;
+            for (const word of words) if (path.includes(word)) score += 5;
+            if (/(^|\/)(readme\.md|package\.json|vite\.config\.[jt]s|server\.[jt]s|app\.[jt]s|index\.html)$/i.test(file.path)) score += 3;
+            if (file.size && file.size < 80000) score += 1;
+            return { ...file, score };
+        }).sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+
+        const chosen = scored.slice(0, 8);
+        const parts = [];
+        let total = 0;
+        for (const file of chosen) {
+            if (total > 55000) break;
+            const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/file?path=${encodeURIComponent(file.path)}&ref=${encodeURIComponent(branch)}`, { headers: githubAuthHeaders(), credentials: 'include' });
+            const data = await r.json();
+            if (!r.ok || typeof data.content !== 'string') continue;
+            const remaining = Math.max(0, 55000 - total);
+            const text = data.content.slice(0, remaining);
+            total += text.length;
+            parts.push(`--- ${file.path} ---\n${text}`);
+        }
+
+        const treePreview = files.slice(0, 300).map(f => f.path).join('\n');
+        return `[Dépôt GitHub actif]\nDépôt : ${repo}\nBranche : ${branch}\n\nArborescence :\n${treePreview}\n\nFichiers chargés automatiquement :\n${parts.join('\n\n')}`;
+    } catch {
+        return '';
+    }
 }
 
 function showTypingIndicator() {
@@ -1581,7 +1597,10 @@ function buildSystemPrompt() {
     const conv = getCurrentConversation();
     if (conv?.assistantMode === 'code') {
         const task = conv.codeTask || 'build';
-        prompt += `\n\nMode Code actif (${task}). Réponds comme un ingénieur logiciel : privilégie du code exécutable, des changements minimaux et compatibles avec l'architecture fournie. Pour plusieurs fichiers, annonce chaque chemin avec un titre Markdown puis fournis les contenus ou diffs complets. Vérifie les imports, contrats d'API, variables d'environnement, erreurs de syntaxe et effets de bord avant de conclure.`;
+        prompt += `\n\nMode Code actif (${task}). Réponds comme un ingénieur logiciel : privilégie du code exécutable, des changements minimaux et compatibles avec l'architecture fournie. Pour plusieurs fichiers, retourne aussi un bloc nexus-files avec les fichiers complets modifiés afin qu'ils puissent être commités. Vérifie les imports, contrats d'API, variables d'environnement, erreurs de syntaxe et effets de bord avant de conclure.`;
+        const repo = selectedGithubRepo();
+        const branch = selectedGithubBranch();
+        if (repo) prompt += `\nDépôt GitHub actif : ${repo} · branche ${branch || 'par défaut'}. Travaille en priorité dans ce dépôt et conserve ses conventions existantes.`;
     }
     prompt += buildMemoryContext();
     return prompt;
@@ -1690,6 +1709,11 @@ async function getGroqAIResponse(message, searchContext = null) {
 
         if (searchContext) {
             fullMessage = searchContext + '\n\n---\n\nQuestion : ' + fullMessage;
+        }
+
+        const githubContext = await buildGithubRepoContext(message);
+        if (githubContext) {
+            fullMessage = githubContext + '\n\n---\n\nDemande utilisateur : ' + fullMessage;
         }
 
         if (attachedFiles.length > 0) {
