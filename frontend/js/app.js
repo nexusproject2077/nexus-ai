@@ -2259,6 +2259,111 @@ function updateColorDot() {
     if (dot && select) dot.style.background = select.value;
 }
 
+// Trusted contacts are consent-based. No automatic crisis monitoring is claimed.
+let trustedContactInviteUrl = '';
+
+function trustedContactError(message) {
+    const el = id('trusted-contact-error');
+    if (el) el.textContent = message || '';
+}
+
+async function refreshTrustedContact() {
+    const status = id('trusted-contact-status');
+    const form = id('trusted-contact-form');
+    const remove = id('trusted-contact-remove');
+    const share = id('trusted-contact-share');
+    if (!status || !getToken()) return;
+    status.textContent = 'Chargement du contact…';
+    trustedContactError('');
+    try {
+        const response = await fetch(`${API_BASE}/user/trusted-contact`, { headers: authHeaders(), cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Impossible de charger le contact.');
+        const contact = data.contact;
+        if (!contact) {
+            status.textContent = 'Aucun contact de confiance enregistré.';
+            form?.classList.remove('hidden');
+            remove?.classList.add('hidden');
+            share?.classList.add('hidden');
+            return;
+        }
+        const state = contact.status === 'accepted' ? 'Invitation acceptée' : 'En attente de son accord';
+        status.textContent = `${contact.name} (${contact.email}) : ${state}.`;
+        if (contact.status === 'pending' && contact.expiresAt && new Date(contact.expiresAt) < new Date()) {
+            status.textContent += ' L’invitation a expiré. Retire ce contact pour en créer une nouvelle.';
+        }
+        form?.classList.add('hidden');
+        remove?.classList.remove('hidden');
+        if (!trustedContactInviteUrl || contact.status === 'accepted') share?.classList.add('hidden');
+    } catch (error) {
+        status.textContent = 'Contact indisponible.';
+        form?.classList.add('hidden');
+        remove?.classList.add('hidden');
+        trustedContactError(error.message);
+    }
+}
+
+window.inviteTrustedContact = async function(event) {
+    event.preventDefault();
+    const button = id('trusted-contact-submit');
+    const name = id('trusted-contact-name')?.value.trim() || '';
+    const email = id('trusted-contact-email')?.value.trim() || '';
+    if (!name || !email) return;
+    trustedContactError('');
+    if (button) button.disabled = true;
+    try {
+        const response = await fetch(`${API_BASE}/user/trusted-contact/invite`, {
+            method: 'POST', headers: authHeaders(), body: JSON.stringify({ name, email })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Impossible de créer l’invitation.');
+        trustedContactInviteUrl = data.inviteUrl || '';
+        await refreshTrustedContact();
+        if (trustedContactInviteUrl) id('trusted-contact-share')?.classList.remove('hidden');
+    } catch (error) {
+        trustedContactError(error.message);
+    } finally {
+        if (button) button.disabled = false;
+    }
+};
+
+window.copyTrustedContactInvite = async function() {
+    if (!trustedContactInviteUrl) return trustedContactError('Crée une nouvelle invitation pour obtenir un lien.');
+    try {
+        await navigator.clipboard.writeText(trustedContactInviteUrl);
+        trustedContactError('Lien copié. Partage-le uniquement avec la personne concernée.');
+    } catch {
+        trustedContactError('Impossible de copier le lien automatiquement. Utilise le bouton Partager.');
+    }
+};
+
+window.shareTrustedContactInvite = async function() {
+    if (!trustedContactInviteUrl) return;
+    const name = id('trusted-contact-name')?.value.trim() || 'toi';
+    const message = `Bonjour, je souhaite te désigner comme contact de confiance sur Nexus AI. Si tu es d'accord, ouvre ce lien et accepte l'invitation : ${trustedContactInviteUrl}`;
+    if (navigator.share) {
+        try { await navigator.share({ title: 'Invitation Nexus AI', text: message }); } catch {}
+    } else {
+        window.location.href = `mailto:${encodeURIComponent(id('trusted-contact-email')?.value.trim() || '')}?subject=${encodeURIComponent('Invitation contact de confiance Nexus AI')}&body=${encodeURIComponent(message)}`;
+    }
+};
+
+window.removeTrustedContact = async function() {
+    if (!confirm('Retirer ce contact de confiance et révoquer son invitation ?')) return;
+    trustedContactError('');
+    try {
+        const response = await fetch(`${API_BASE}/user/trusted-contact`, { method: 'DELETE', headers: authHeaders() });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || 'Suppression impossible.');
+        }
+        trustedContactInviteUrl = '';
+        id('trusted-contact-name').value = '';
+        id('trusted-contact-email').value = '';
+        await refreshTrustedContact();
+    } catch (error) { trustedContactError(error.message); }
+};
+
 // Dedicated settings view: full-page layout, with a category index on phones.
 const settingsTabTitles = {
     general: 'Général', notifications: 'Notifications',
@@ -2289,6 +2394,7 @@ window.openSettings = function() {
     populateSettingsDOM(s);
     applySettings();
     updateStorageInfo();
+    refreshTrustedContact();
     const user = getUser();
     if (user) {
         const uEl = id('account-username');
