@@ -6637,3 +6637,21 @@ body.settings-page-open { overflow: hidden !important; }
     #settings-modal .settings-title { font-size: 25px; margin-bottom: 16px; }
     #settings-modal .settings-row { gap: 14px; }
 }
+
+
+/* Settings mobile header: center NEXUS AI independently of side labels. */
+@media (max-width: 768px) {
+    .settings-page-header .settings-page-brand {
+        position: absolute !important;
+        left: 50% !important;
+        top: calc(env(safe-area-inset-top, 0px) + 33px) !important;
+        transform: translate(-50%, -50%) !important;
+        pointer-events: none !important;
+        white-space: nowrap !important;
+    }
+    .settings-page-header .settings-page-back,
+    .settings-page-header .settings-page-header-title {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+}
