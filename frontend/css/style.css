@@ -916,6 +916,357 @@ h1 {
 
 #attach-file-btn svg { width: 18px; height: 18px; }
 
+
+.composer-plus-wrap {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.composer-plus-menu {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 10px);
+    width: 270px;
+    max-width: calc(100vw - 24px);
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px;
+    background: rgba(22,24,30,.86);
+    -webkit-backdrop-filter: blur(26px) saturate(145%);
+    backdrop-filter: blur(26px) saturate(145%);
+    box-shadow: 0 18px 50px rgba(0,0,0,.42), inset 0 1px rgba(255,255,255,.10);
+    z-index: 1500;
+}
+
+.composer-plus-menu.hidden { display: none; }
+
+.composer-plus-item {
+    width: 100%;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 11px;
+    background: transparent;
+    color: rgba(255,255,255,.84);
+    font: 500 12px/1.2 var(--font-sans);
+    text-align: left;
+    cursor: pointer;
+}
+
+.composer-plus-item:hover:not(:disabled) {
+    background: rgba(255,255,255,.08);
+}
+
+.composer-plus-item:disabled {
+    opacity: .38;
+    cursor: not-allowed;
+}
+
+.composer-plus-item svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    color: rgba(255,255,255,.62);
+}
+
+.composer-plus-divider {
+    height: 1px;
+    margin: 6px 4px;
+    background: rgba(255,255,255,.08);
+}
+
+.composer-plus-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 10px 6px;
+}
+
+.composer-plus-section-head > span {
+    color: rgba(255,255,255,.92);
+    font: 650 12px/1 var(--font-sans);
+}
+
+.composer-plus-section-head small {
+    min-width: 0;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(255,255,255,.43);
+    font: 500 10px/1 var(--font-sans);
+}
+
+/* GitHub repository browser */
+.github-repo-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(4,6,12,.56);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+
+.github-repo-modal {
+    width: min(720px, 100%);
+    max-height: min(78vh, 720px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 22px;
+    background: rgba(23,25,31,.94);
+    box-shadow: 0 28px 90px rgba(0,0,0,.55), inset 0 1px rgba(255,255,255,.11);
+}
+
+.github-repo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.github-repo-header strong {
+    display: block;
+    color: rgba(255,255,255,.94);
+    font-size: 15px;
+}
+
+.github-repo-header span {
+    display: block;
+    margin-top: 3px;
+    color: rgba(255,255,255,.44);
+    font-size: 11px;
+}
+
+.github-repo-close {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    background: rgba(255,255,255,.055);
+    color: rgba(255,255,255,.62);
+    cursor: pointer;
+}
+
+.github-repo-close svg { width: 16px; height: 16px; }
+
+.github-repo-toolbar {
+    padding: 12px 14px 8px;
+}
+
+#github-repo-search,
+.github-file-search {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 38px;
+    padding: 0 12px;
+    outline: none;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 11px;
+    background: rgba(255,255,255,.055);
+    color: rgba(255,255,255,.9);
+    font: 500 12px var(--font-sans);
+}
+
+#github-repo-search:focus,
+.github-file-search:focus {
+    border-color: rgba(0,210,255,.33);
+    box-shadow: 0 0 0 3px rgba(0,210,255,.07);
+}
+
+.github-repo-content {
+    min-height: 220px;
+    overflow-y: auto;
+    padding: 6px 14px 14px;
+}
+
+.github-repo-card,
+.github-file-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: rgba(255,255,255,.88);
+    text-align: left;
+    cursor: pointer;
+}
+
+.github-repo-card {
+    min-height: 58px;
+    padding: 8px 10px;
+}
+
+.github-repo-card:hover,
+.github-file-row:hover {
+    background: rgba(255,255,255,.065);
+}
+
+.github-repo-card-icon {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 10px;
+    background: rgba(255,255,255,.045);
+}
+
+.github-repo-card-icon svg,
+.github-repo-chevron,
+.github-file-row svg {
+    width: 17px;
+    height: 17px;
+}
+
+.github-repo-card-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.github-repo-card-copy strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.github-repo-card-copy small {
+    display: block;
+    margin-top: 3px;
+    color: rgba(255,255,255,.42);
+    font-size: 10px;
+}
+
+.github-repo-chevron { color: rgba(255,255,255,.28); }
+
+.github-browser-nav {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0 10px;
+}
+
+.github-browser-nav > button {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 9px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 10px;
+    background: rgba(255,255,255,.045);
+    color: rgba(255,255,255,.72);
+    cursor: pointer;
+}
+
+.github-browser-nav > button svg { width: 14px; height: 14px; }
+
+.github-browser-nav > div {
+    min-width: 0;
+}
+
+.github-browser-nav strong,
+.github-browser-nav span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.github-browser-nav strong { font-size: 12px; }
+.github-browser-nav span { margin-top: 2px; color: rgba(255,255,255,.42); font-size: 10px; }
+
+#github-branch-select {
+    max-width: 180px;
+    min-height: 34px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    background: rgba(255,255,255,.055);
+    color: rgba(255,255,255,.85);
+    padding: 0 9px;
+    font: 500 11px var(--font-sans);
+}
+
+.github-file-search { margin-bottom: 8px; }
+
+.github-file-list {
+    max-height: 430px;
+    overflow-y: auto;
+}
+
+.github-file-row {
+    min-height: 40px;
+    padding: 5px 9px;
+}
+
+.github-file-row svg {
+    flex: 0 0 auto;
+    color: rgba(0,210,255,.68);
+}
+
+.github-file-row span {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: 500 11px var(--font-sans);
+}
+
+.github-file-row small {
+    color: rgba(255,255,255,.35);
+    font-size: 9px;
+}
+
+.github-browser-loading,
+.github-browser-empty {
+    padding: 42px 16px;
+    text-align: center;
+    color: rgba(255,255,255,.42);
+    font-size: 12px;
+}
+
+@media (max-width: 600px) {
+    .composer-plus-menu {
+        left: -42px;
+        width: min(290px, calc(100vw - 22px));
+    }
+    .github-repo-overlay {
+        align-items: end;
+        padding: 10px;
+    }
+    .github-repo-modal {
+        max-height: 82vh;
+        border-radius: 20px;
+    }
+    .github-browser-nav {
+        grid-template-columns: auto 1fr;
+    }
+    #github-branch-select {
+        grid-column: 1 / -1;
+        max-width: none;
+        width: 100%;
+    }
+}
+
 #user-input {
     padding: 9px 10px;
     font-size: 0.875rem;
