@@ -6221,3 +6221,40 @@ body {
         top: calc(env(safe-area-inset-top, 0px) + 400px) !important;
     }
 }
+
+
+/* Jeran monogram — occupies only the open space between branding and actions */
+.jeran-logo {
+    display: block;
+    width: 96px;
+    height: 96px;
+    flex: 0 0 auto;
+    overflow: visible;
+    fill: none;
+    stroke: #59b8ff;
+    stroke-width: 3.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 14px rgba(59, 156, 255, .16));
+}
+.jeran-logo .j2 { stroke: #8ca6ff; }
+
+@media (max-width: 768px) {
+    .empty-state .jeran-logo {
+        position: absolute !important;
+        top: calc(env(safe-area-inset-top, 0px) + 213px) !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 152px !important;
+        height: 152px !important;
+        margin: 0 !important;
+        pointer-events: none !important;
+    }
+}
+@media (max-width: 430px) {
+    .empty-state .jeran-logo {
+        top: calc(env(safe-area-inset-top, 0px) + 201px) !important;
+        width: 148px !important;
+        height: 148px !important;
+    }
+}
