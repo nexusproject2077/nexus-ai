@@ -5798,3 +5798,17 @@ button,
         bottom: calc(114px + env(safe-area-inset-bottom, 0px)) !important;
     }
 }
+
+
+/* Provider signature clearance: keep it fully visible above composer */
+@media (max-width: 768px) {
+    .footer {
+        bottom: calc(154px + env(safe-area-inset-bottom, 0px)) !important;
+        z-index: 1010 !important;
+    }
+}
+@media (max-width: 390px) {
+    .footer {
+        bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
