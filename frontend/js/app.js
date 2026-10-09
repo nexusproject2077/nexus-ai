@@ -135,6 +135,10 @@ function initChatPage() {
 
     consumeGithubOAuthReturn();
 
+    // Always land on the empty home after login, registration or a fresh visit.
+    // This draft is local only: saved conversations stay in the sidebar.
+    createNewConversation();
+
     const user = getUser();
     if (user) document.getElementById('sidebar-username').textContent = `@${user.username}`;
 
@@ -651,21 +655,21 @@ async function loadConversationsFromServer() {
         return;
     }
 
-    conversations = remote;
-    lastSyncFingerprint = conversationFingerprint(conversations);
+    // Refresh the sidebar without navigating away from the fresh home draft.
+    const localDraft = conversations.find(c => c._localDraft);
+    conversations = localDraft ? [localDraft, ...remote] : remote;
+    lastSyncFingerprint = conversationFingerprint(remote);
     renderConversationsList();
 
+    if (localDraft) return;
     if (conversations.length === 0) {
         createNewConversation();
         return;
     }
 
-    try {
-        await loadConversation(conversations[0]._id);
-    } catch (err) {
-        console.error('Erreur affichage conversation:', err);
-        renderConversationsList();
-    }
+    // Only restore an already-selected conversation during an explicit session.
+    if (currentConversationId && conversations.some(c => c._id === currentConversationId)) return;
+    createNewConversation();
 }
 
 function createNewConversation() {
