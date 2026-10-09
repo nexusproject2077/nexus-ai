@@ -212,8 +212,31 @@ if (conversationsList) {
     });
 }
 
-// ===== FICHIERS =====
-if (attachFileBtn) attachFileBtn.addEventListener('click', () => fileInput.click());
+// ===== FICHIERS / MENU + =====
+const composerPlusMenu = document.getElementById('composer-plus-menu');
+const plusUploadBtn = document.getElementById('plus-upload-btn');
+
+function closeComposerPlusMenu() {
+    composerPlusMenu?.classList.add('hidden');
+}
+
+if (attachFileBtn) {
+    attachFileBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        composerPlusMenu?.classList.toggle('hidden');
+        if (!composerPlusMenu?.classList.contains('hidden')) refreshGithubStatus();
+    });
+}
+if (plusUploadBtn) {
+    plusUploadBtn.addEventListener('click', () => {
+        closeComposerPlusMenu();
+        fileInput?.click();
+    });
+}
+document.addEventListener('click', (event) => {
+    if (!composerPlusMenu || composerPlusMenu.classList.contains('hidden')) return;
+    if (!event.target.closest('.composer-plus-wrap')) closeComposerPlusMenu();
+});
 
 if (fileInput) {
     fileInput.addEventListener('change', async (e) => {
@@ -1294,30 +1317,53 @@ function consumeGithubOAuthReturn() {
             showToast('GitHub connecté.', '', 2500);
         }, 0);
     } else if (failed) {
+        sessionStorage.removeItem('nexus_github_return_state');
         history.replaceState(null, '', window.location.pathname + window.location.search);
         setTimeout(() => showToast('Connexion GitHub échouée.', 'error', 3500), 0);
     }
 }
+function setGithubConnectLabel(connected) {
+    const button = document.getElementById('github-connect-btn');
+    if (!button) return;
+    button.dataset.connected = connected ? 'true' : 'false';
+    const label = button.querySelector('span');
+    if (label) label.textContent = connected ? 'Déconnecter' : 'Connecter GitHub';
+}
 async function refreshGithubStatus() {
-    const status = document.getElementById('github-status'); if (!status || !getToken()) return;
+    const status = document.getElementById('github-status');
+    if (!status || !getToken()) return;
     try {
         const r = await fetch(`${API_BASE}/github/status`, { headers: githubAuthHeaders(), credentials: 'include' });
         const d = await r.json();
-        status.textContent = d.connected ? `Connecté : ${d.login}` : 'Non connecté';
-        document.getElementById('github-connect-btn').textContent = d.connected ? 'Déconnecter' : 'Connecter GitHub';
+        const connected = !!d.connected;
+        status.textContent = connected ? `Connecté : ${d.login}` : 'Non connecté';
+        setGithubConnectLabel(connected);
         const readBtn = document.getElementById('github-read-btn');
-        if (readBtn) readBtn.disabled = !d.connected;
+        if (readBtn) readBtn.disabled = !connected;
     } catch {
         status.textContent = 'Indisponible';
+        setGithubConnectLabel(false);
     }
 }
 async function connectGithub() {
     const button = document.getElementById('github-connect-btn');
-    if (button.textContent.includes('Déconnecter')) {
+    if (button?.dataset.connected === 'true') {
         sessionStorage.removeItem('nexus_github_session');
+        sessionStorage.removeItem('nexus_github_return_state');
         await fetch(`${API_BASE}/github/disconnect`, { method: 'POST', headers: authHeaders(), credentials: 'include' });
         return refreshGithubStatus();
     }
+
+    // Keep the exact conversation/mode open after the GitHub round trip.
+    await ensureCurrentConversationPersisted();
+    const conv = getCurrentConversation();
+    sessionStorage.setItem('nexus_github_return_state', JSON.stringify({
+        conversationId: currentConversationId,
+        assistantMode: conv?.assistantMode || 'chat',
+        codeTask: conv?.codeTask || 'build',
+        chatScrollTop: chatBox?.scrollTop || 0,
+    }));
+
     const r = await fetch(`${API_BASE}/github/connect`, { headers: authHeaders(), credentials: 'include' });
     const d = await r.json();
     if (!r.ok) return showToast(d.error || 'Connexion GitHub indisponible.', 'error');
@@ -1326,28 +1372,162 @@ async function connectGithub() {
 async function pushGeneratedProject() {
     if (!generatedProject.files.length) return;
     const reposResponse = await fetch(`${API_BASE}/github/repos`, { headers: githubAuthHeaders(), credentials: 'include' });
-    const repos = await reposResponse.json(); if (!reposResponse.ok || !repos.length) return showToast(repos.error || 'Aucun dépôt GitHub accessible.', 'error');
+    const repos = await reposResponse.json();
+    if (!reposResponse.ok || !repos.length) return showToast(repos.error || 'Aucun dépôt GitHub accessible.', 'error');
     const choice = prompt(`Choisis un dépôt :\n${repos.map((r, i) => `${i + 1}. ${r.fullName}${r.private ? ' (privé)' : ''}`).join('\n')}`);
     const selected = repos[Number(choice) - 1]; if (!selected) return;
     const repo = selected.fullName;
     const [owner, name] = repo.split('/');
     const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: githubAuthHeaders(), credentials: 'include' });
-    const branches = await branchesResponse.json(); if (!branchesResponse.ok || !branches.length) return showToast(branches.error || 'Branches indisponibles.', 'error');
+    const branches = await branchesResponse.json();
+    if (!branchesResponse.ok || !branches.length) return showToast(branches.error || 'Branches indisponibles.', 'error');
     const branchChoice = prompt(`Choisis une branche :\n${branches.map((b, i) => `${i + 1}. ${b.name}`).join('\n')}`, String(Math.max(1, branches.findIndex(b => b.name === selected.defaultBranch) + 1)));
     const branch = branches[Number(branchChoice) - 1]?.name; if (!branch) return;
     const message = prompt('Message de commit :', 'Create files from Nexus AI'); if (!message) return;
     if (!confirm(`Créer ou mettre à jour ${generatedProject.files.length} fichier(s) sur ${repo}/${branch} ?`)) return;
     const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/commit`, { method: 'POST', headers: githubAuthHeaders(), credentials: 'include', body: JSON.stringify({ branch, message, files: generatedProject.files, confirm: true }) });
-    const d = await r.json(); showToast(r.ok ? `Commit créé : ${d.results.length} fichier(s).` : (d.error || 'Commit impossible.'), r.ok ? '' : 'error', 4000);
+    const d = await r.json();
+    showToast(r.ok ? `Commit créé : ${d.results.length} fichier(s).` : (d.error || 'Commit impossible.'), r.ok ? '' : 'error', 4000);
 }
-async function readGithubFile() {
-    const repo = prompt('Dépôt à lire (propriétaire/nom) :'); if (!repo || !/^[^/]+\/[^/]+$/.test(repo)) return;
-    const branch = prompt('Branche ou ref :', 'main'); const path = prompt('Chemin du fichier :'); if (!branch || !path) return;
+function escapeGithubHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
+}
+function closeGithubRepoBrowser() {
+    document.getElementById('github-repo-overlay')?.remove();
+}
+async function readGithubRepository() {
+    closeComposerPlusMenu();
+    let overlay = document.getElementById('github-repo-overlay');
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement('div');
+    overlay.id = 'github-repo-overlay';
+    overlay.className = 'github-repo-overlay';
+    overlay.innerHTML = `
+        <div class="github-repo-modal" role="dialog" aria-modal="true" aria-label="Lire un dépôt GitHub">
+            <div class="github-repo-header">
+                <div><strong>Lire un dépôt</strong><span>Choisis un dépôt GitHub accessible à Nexus AI</span></div>
+                <button type="button" class="github-repo-close" aria-label="Fermer">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="github-repo-toolbar">
+                <input id="github-repo-search" type="search" placeholder="Rechercher un dépôt…" autocomplete="off">
+            </div>
+            <div id="github-repo-content" class="github-repo-content"><div class="github-browser-loading">Chargement des dépôts…</div></div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.github-repo-close').onclick = closeGithubRepoBrowser;
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeGithubRepoBrowser(); });
+
+    const content = overlay.querySelector('#github-repo-content');
+    try {
+        const response = await fetch(`${API_BASE}/github/repos`, { headers: githubAuthHeaders(), credentials: 'include' });
+        const repos = await response.json();
+        if (!response.ok) throw new Error(repos.error || 'Impossible de charger les dépôts.');
+        renderGithubRepoList(repos);
+    } catch (error) {
+        content.innerHTML = `<div class="github-browser-empty">${escapeGithubHTML(error.message)}</div>`;
+    }
+}
+function renderGithubRepoList(repos) {
+    const content = document.getElementById('github-repo-content');
+    const search = document.getElementById('github-repo-search');
+    if (!content) return;
+
+    const render = (query = '') => {
+        const q = query.trim().toLowerCase();
+        const filtered = repos.filter(repo => !q || repo.fullName.toLowerCase().includes(q));
+        if (!filtered.length) {
+            content.innerHTML = '<div class="github-browser-empty">Aucun dépôt trouvé.</div>';
+            return;
+        }
+        content.innerHTML = filtered.map(repo => `
+            <button type="button" class="github-repo-card" data-repo="${escapeGithubHTML(repo.fullName)}" data-default-branch="${escapeGithubHTML(repo.defaultBranch || 'main')}">
+                <span class="github-repo-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/></svg></span>
+                <span class="github-repo-card-copy"><strong>${escapeGithubHTML(repo.fullName)}</strong><small>${repo.private ? 'Privé' : 'Public'} · ${escapeGithubHTML(repo.defaultBranch || 'main')}</small></span>
+                <svg class="github-repo-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+        `).join('');
+        content.querySelectorAll('.github-repo-card').forEach(button => {
+            button.onclick = () => loadGithubRepository(button.dataset.repo, button.dataset.defaultBranch);
+        });
+    };
+    render();
+    if (search) search.oninput = () => render(search.value);
+}
+async function loadGithubRepository(repo, defaultBranch = 'main') {
+    const content = document.getElementById('github-repo-content');
+    if (!content) return;
+    content.innerHTML = '<div class="github-browser-loading">Chargement du dépôt…</div>';
+
+    const [owner, name] = repo.split('/');
+    try {
+        const branchesResponse = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/branches`, { headers: githubAuthHeaders(), credentials: 'include' });
+        const branches = await branchesResponse.json();
+        if (!branchesResponse.ok) throw new Error(branches.error || 'Branches indisponibles.');
+        const selectedBranch = branches.some(b => b.name === defaultBranch) ? defaultBranch : (branches[0]?.name || defaultBranch);
+
+        content.innerHTML = `
+            <div class="github-browser-nav">
+                <button type="button" id="github-browser-back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+                    Dépôts
+                </button>
+                <div><strong>${escapeGithubHTML(repo)}</strong><span>Parcourir les fichiers</span></div>
+                <select id="github-branch-select">${branches.map(b => `<option value="${escapeGithubHTML(b.name)}"${b.name === selectedBranch ? ' selected' : ''}>${escapeGithubHTML(b.name)}</option>`).join('')}</select>
+            </div>
+            <input id="github-file-search" class="github-file-search" type="search" placeholder="Rechercher un fichier…" autocomplete="off">
+            <div id="github-file-list" class="github-file-list"><div class="github-browser-loading">Chargement des fichiers…</div></div>
+        `;
+        document.getElementById('github-browser-back').onclick = readGithubRepository;
+        document.getElementById('github-branch-select').onchange = e => loadGithubTree(repo, e.target.value);
+        await loadGithubTree(repo, selectedBranch);
+    } catch (error) {
+        content.innerHTML = `<div class="github-browser-empty">${escapeGithubHTML(error.message)}</div>`;
+    }
+}
+async function loadGithubTree(repo, branch) {
+    const list = document.getElementById('github-file-list');
+    if (!list) return;
+    list.innerHTML = '<div class="github-browser-loading">Chargement des fichiers…</div>';
+    const [owner, name] = repo.split('/');
+
+    try {
+        const response = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/tree?ref=${encodeURIComponent(branch)}`, { headers: githubAuthHeaders(), credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Arborescence indisponible.');
+        const files = data.files || [];
+        const search = document.getElementById('github-file-search');
+
+        const render = (query = '') => {
+            const q = query.trim().toLowerCase();
+            const filtered = files.filter(file => !q || file.path.toLowerCase().includes(q)).slice(0, 400);
+            list.innerHTML = filtered.length ? filtered.map(file => `
+                <button type="button" class="github-file-row" data-path="${escapeGithubHTML(file.path)}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+                    <span>${escapeGithubHTML(file.path)}</span>
+                    <small>${file.size ? fileSizeText(' '.repeat(Math.min(file.size, 100000))) : ''}</small>
+                </button>
+            `).join('') : '<div class="github-browser-empty">Aucun fichier trouvé.</div>';
+            list.querySelectorAll('.github-file-row').forEach(button => {
+                button.onclick = () => openGithubFile(repo, branch, button.dataset.path);
+            });
+        };
+        render();
+        if (search) search.oninput = () => render(search.value);
+    } catch (error) {
+        list.innerHTML = `<div class="github-browser-empty">${escapeGithubHTML(error.message)}</div>`;
+    }
+}
+async function openGithubFile(repo, branch, path) {
     const [owner, name] = repo.split('/');
     const r = await fetch(`${API_BASE}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/file?path=${encodeURIComponent(path)}&ref=${encodeURIComponent(branch)}`, { headers: githubAuthHeaders(), credentials: 'include' });
-    const file = await r.json(); if (!r.ok) return showToast(file.error || 'Lecture impossible.', 'error');
+    const file = await r.json();
+    if (!r.ok) return showToast(file.error || 'Lecture impossible.', 'error');
     setGeneratedProject({ files: [{ path: file.path, content: file.content, language: path.split('.').pop() }] });
-    showToast(`${file.path} chargé dans le projet.`, '', 3000);
+    closeGithubRepoBrowser();
+    showToast(`${file.path} chargé depuis ${repo}.`, '', 3000);
 }
 
 function showTypingIndicator() {
@@ -1660,7 +1840,7 @@ document.getElementById('preview-expand-btn')?.addEventListener('click', () => {
     const html = previewDocument(); if (!html) return; const url = URL.createObjectURL(new Blob([html], { type: 'text/html' })); window.open(url, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(url), 60000);
 });
 document.getElementById('github-connect-btn')?.addEventListener('click', connectGithub);
-document.getElementById('github-read-btn')?.addEventListener('click', readGithubFile);
+document.getElementById('github-read-btn')?.addEventListener('click', readGithubRepository);
 document.getElementById('github-push-btn')?.addEventListener('click', pushGeneratedProject);
 
 if (userInput) {
@@ -1734,7 +1914,18 @@ async function loadSettingsFromServer() {
             lastSyncFingerprint = conversationFingerprint(remote);
             renderConversationsList();
 
-            if (!localDraft && remote.length && !remote.some(c => c._id === currentConversationId)) {
+            const githubReturn = (() => {
+                try { return JSON.parse(sessionStorage.getItem('nexus_github_return_state') || 'null'); }
+                catch { return null; }
+            })();
+            const returnConversation = githubReturn?.conversationId
+                ? remote.find(c => c._id === githubReturn.conversationId)
+                : null;
+
+            if (!localDraft && returnConversation) {
+                await loadConversation(returnConversation._id);
+                sessionStorage.removeItem('nexus_github_return_state');
+            } else if (!localDraft && remote.length && !remote.some(c => c._id === currentConversationId)) {
                 await loadConversation(remote[0]._id);
             } else if (!localDraft && !remote.length && !conversations.length) {
                 createNewConversation();
