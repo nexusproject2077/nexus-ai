@@ -6298,3 +6298,17 @@ body {
         animation: none !important;
     }
 }
+
+
+/* Mobile: the top-left conversation name is desktop-only.
+   On the empty home, hide the redundant floating "new chat" action;
+   retain it once a conversation has content. */
+@media (max-width: 768px) {
+    #conversation-title-bar {
+        display: none !important;
+    }
+
+    body:has(#chat-box .empty-state) #new-chat-collapsed {
+        display: none !important;
+    }
+}
