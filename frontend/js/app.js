@@ -2259,10 +2259,32 @@ function updateColorDot() {
     if (dot && select) dot.style.background = select.value;
 }
 
+// Dedicated settings view: full-page layout, with a category index on phones.
+const settingsTabTitles = {
+    general: 'Général', notifications: 'Notifications',
+    personnalisation: 'Personnalisation', applications: 'Applications',
+    facturation: 'Facturation', donnees: 'Gestion des données',
+    stockage: 'Stockage', securite: 'Sécurité',
+    controles: 'Contrôles parentaux', contact: 'Contact de confiance',
+    compte: 'Compte', clavier: 'Clavier'
+};
+
+function showSettingsCategoryIndex() {
+    const page = id('settings-overlay');
+    if (!page) return;
+    page.classList.remove('settings-detail-open');
+    const heading = id('settings-page-header-title');
+    const backLabel = id('settings-back-label');
+    if (heading) heading.textContent = 'Paramètres';
+    if (backLabel) backLabel.textContent = 'Retour au chat';
+}
+
 window.openSettings = function() {
-    const overlay = id('settings-overlay');
-    if (!overlay) return;
-    overlay.classList.remove('hidden');
+    const page = id('settings-overlay');
+    if (!page) return;
+    if (isMobile() && !sidebar.classList.contains('hidden')) closeSidebar();
+    page.classList.remove('hidden');
+    document.body.classList.add('settings-page-open');
     const s = loadSettings();
     populateSettingsDOM(s);
     applySettings();
@@ -2276,25 +2298,67 @@ window.openSettings = function() {
         const pEl = id('s-phone');
         if (pEl) pEl.value = user.phone || '';
     }
+    if (isMobile()) showSettingsCategoryIndex();
+    else switchSettingsTab(document.querySelector('.settings-nav-item.active')?.dataset.tab || 'general');
+    if (!location.hash.startsWith('#settings')) {
+        history.pushState({ nexusSettingsPage: true }, '', '#settings');
+    }
 };
+
+function hideSettingsPage() {
+    const page = id('settings-overlay');
+    if (page) page.classList.add('hidden');
+    document.body.classList.remove('settings-page-open');
+    showSettingsCategoryIndex();
+}
 
 window.closeSettings = function() {
-    const overlay = id('settings-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    hideSettingsPage();
+    if (location.hash.startsWith('#settings')) {
+        if (history.state?.nexusSettingsPage) history.back();
+        else history.replaceState(null, '', location.pathname + location.search);
+    }
 };
 
-window.handleSettingsOverlayClick = function(e) {
-    if (e.target === id('settings-overlay')) closeSettings();
+window.settingsBack = function() {
+    const page = id('settings-overlay');
+    if (isMobile() && page?.classList.contains('settings-detail-open')) {
+        showSettingsCategoryIndex();
+        return;
+    }
+    closeSettings();
+};
+
+// Browser back also leaves settings rather than leaving the underlying chat.
+window.addEventListener('popstate', () => {
+    if (!location.hash.startsWith('#settings')) hideSettingsPage();
+});
+
+window.handleSettingsOverlayClick = function() {
+    // Settings is a dedicated page, not a dismissible backdrop.
 };
 
 window.switchSettingsTab = function(tab) {
+    if (!settingsTabTitles[tab]) return;
     document.querySelectorAll('.settings-nav-item').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
     document.querySelectorAll('.settings-panel').forEach(panel => {
         panel.classList.toggle('active', panel.id === 'tab-' + tab);
     });
+    const page = id('settings-overlay');
+    if (isMobile()) page?.classList.add('settings-detail-open');
+    const heading = id('settings-page-header-title');
+    const backLabel = id('settings-back-label');
+    if (heading) heading.textContent = isMobile() ? settingsTabTitles[tab] : 'Paramètres';
+    if (backLabel) backLabel.textContent = isMobile() ? 'Paramètres' : 'Retour au chat';
+    const content = document.querySelector('.settings-content');
+    if (content) content.scrollTop = 0;
 };
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !id('settings-overlay')?.classList.contains('hidden')) settingsBack();
+});
 
 function updateStorageInfo() {
     try {
