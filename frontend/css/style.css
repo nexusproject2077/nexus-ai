@@ -5825,3 +5825,16 @@ button,
         bottom: calc(134px + env(safe-area-inset-bottom, 0px)) !important;
     }
 }
+
+
+/* Final mobile provider-label placement: centered in the gap marked by user */
+@media (max-width: 768px) {
+    .footer {
+        bottom: calc(137px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
+@media (max-width: 390px) {
+    .footer {
+        bottom: calc(135px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
