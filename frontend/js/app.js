@@ -1556,7 +1556,13 @@ async function buildGithubRepoContext(message) {
     }
 }
 
+function setFooterGenerating(generating) {
+    const footer = document.querySelector('.footer');
+    if (footer) footer.classList.toggle('generation-active', !!generating);
+}
+
 function showTypingIndicator() {
+    setFooterGenerating(true);
     const el = document.createElement('div');
     el.className = 'typing-indicator';
     el.id = 'typing';
@@ -1568,6 +1574,7 @@ function showTypingIndicator() {
 function hideTypingIndicator() {
     const el = document.getElementById('typing');
     if (el) el.remove();
+    setFooterGenerating(false);
 }
 
 // ===== TICKET =====
