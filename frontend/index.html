@@ -911,11 +911,29 @@
                     <h2 class="settings-title">Contact de confiance</h2>
                     <div class="settings-divider"></div>
 
-                    <div class="settings-empty">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.3"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                        <p>Aucun contact de confiance ajouté.</p>
-                        <button class="settings-action-btn">Ajouter un contact</button>
+                    <p class="settings-desc trusted-contact-intro">Choisis une personne de confiance et invite-la à accepter explicitement. Aucune conversation ne lui sera transmise.</p>
+                    <div class="trusted-contact-notice" role="note">
+                        <strong>Important</strong>
+                        <p>La gestion des contacts fonctionne, mais la détection automatique de situations de crise et l'envoi d'alertes ne sont pas activés. Ce service ne remplace pas les secours. En France, en cas de danger immédiat, appelle le 15 ou le 112 ; le 3114 est disponible pour la prévention du suicide.</p>
                     </div>
+                    <div id="trusted-contact-status" class="trusted-contact-status" aria-live="polite">Chargement du contact…</div>
+                    <form id="trusted-contact-form" class="trusted-contact-form hidden" onsubmit="inviteTrustedContact(event)">
+                        <label for="trusted-contact-name">Nom du proche</label>
+                        <input id="trusted-contact-name" type="text" maxlength="100" autocomplete="name" required placeholder="Prénom et nom">
+                        <label for="trusted-contact-email">Adresse e-mail du proche</label>
+                        <input id="trusted-contact-email" type="email" maxlength="254" autocomplete="email" required placeholder="proche@exemple.fr">
+                        <button type="submit" id="trusted-contact-submit" class="settings-action-btn">Créer une invitation</button>
+                        <p class="settings-desc">L'invitation expire après 7 jours. Tu devras transmettre le lien à cette personne. Aucun e-mail n'est envoyé automatiquement.</p>
+                    </form>
+                    <div id="trusted-contact-share" class="trusted-contact-share hidden">
+                        <p>Invitation créée. Transmets ce lien uniquement à la personne choisie :</p>
+                        <div class="trusted-contact-actions">
+                            <button type="button" class="settings-action-btn" onclick="shareTrustedContactInvite()">Partager l'invitation</button>
+                            <button type="button" class="settings-action-btn" onclick="copyTrustedContactInvite()">Copier le lien</button>
+                        </div>
+                    </div>
+                    <button id="trusted-contact-remove" type="button" class="trusted-contact-remove hidden" onclick="removeTrustedContact()">Retirer ce contact</button>
+                    <p id="trusted-contact-error" class="trusted-contact-error" role="alert"></p>
                 </div>
 
                 <!-- COMPTE -->
