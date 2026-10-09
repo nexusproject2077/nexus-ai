@@ -206,6 +206,14 @@ function closeSidebar() {
     saveSidebarStateToServer('hidden');
 }
 
+// iOS Safari: when the drawer is open, swipe gestures outside the drawer
+// must never scroll the conversation or the document behind it.
+document.addEventListener('touchmove', (event) => {
+    if (isMobile() && !sidebar.classList.contains('hidden') && !sidebar.contains(event.target)) {
+        event.preventDefault();
+    }
+}, { passive: false });
+
 window.closeSidebarMobile = closeSidebar;
 
 if (toggleSidebarInside)  toggleSidebarInside.addEventListener('click',  closeSidebar);
