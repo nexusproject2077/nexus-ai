@@ -6937,3 +6937,76 @@ body.settings-page-open { overflow: hidden !important; }
         min-width: 155px !important;
     }
 }
+
+
+/* Security settings: inline controls inside the dedicated page. */
+#tab-securite .security-intro { color: rgba(255,255,255,.52); font-size: 14px; margin: -8px 0 24px; }
+#tab-securite .security-state { color: #8cbbff; font-size: 12px; margin-top: 8px; }
+#tab-securite .security-inline-form {
+    margin: 8px 0 20px;
+    padding: 20px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.035);
+    border: 1px solid rgba(255,255,255,.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+#tab-securite .security-inline-form.hidden { display: none !important; }
+#tab-securite .security-inline-form label {
+    font-size: 13px; font-weight: 600; color: rgba(255,255,255,.82);
+}
+#tab-securite .security-inline-form input {
+    width: 100%; box-sizing: border-box;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px; background: #202127;
+    color: #fff; font: inherit; font-size: 16px;
+    padding: 12px 14px; outline: none;
+}
+#tab-securite .security-inline-form input:focus { border-color: #4c99ed; }
+#tab-securite .security-inline-form > .settings-action-btn { align-self: flex-start; max-width: 100%; white-space: normal; }
+#tab-securite .security-primary { background: #087df1 !important; color: #fff !important; }
+#tab-securite .security-secret {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 15px; letter-spacing: .1em; line-height: 1.8;
+    word-break: break-all; padding: 12px 14px;
+    border-radius: 10px; background: #090a0d; user-select: all;
+}
+#tab-securite .security-feedback { font-size: 13px; line-height: 1.5; color: #8dc9a3; margin: 14px 0; }
+#tab-securite .security-feedback.error { color: #ff8585; }
+#tab-securite .security-session {
+    display: flex; justify-content: space-between; align-items: center; gap: 14px;
+    padding: 13px 0; border-bottom: 1px solid rgba(255,255,255,.08);
+}
+#tab-securite .security-session:last-child { border-bottom: 0; }
+#tab-securite .security-session div { min-width: 0; }
+#tab-securite .security-session strong { font-size: 14px; }
+#tab-securite .security-session p {
+    color: rgba(255,255,255,.55); font-size: 12px; line-height: 1.5;
+    overflow-wrap: anywhere; margin: 4px 0;
+}
+#tab-securite .security-session small { color: rgba(255,255,255,.42); font-size: 11px; }
+#tab-securite .security-session button { flex: 0 0 auto; }
+#tab-securite .settings-action-btn:disabled { opacity: .35; cursor: not-allowed; }
+.login-two-factor {
+    display: flex; flex-direction: column; gap: 10px;
+    margin: 14px 0; padding: 16px;
+    background: rgba(255,255,255,.05); border-radius: 14px;
+}
+.login-two-factor.hidden { display: none !important; }
+.login-two-factor label { font-size: 14px; font-weight: 600; }
+.login-two-factor p { font-size: 13px; color: rgba(255,255,255,.6); margin: 0; }
+.login-two-factor input {
+    width: 100%; box-sizing: border-box; padding: 12px;
+    border-radius: 10px; border: 1px solid rgba(255,255,255,.2);
+    background: #22232a; color: white; font-size: 18px; letter-spacing: .2em;
+}
+.security-cancel-login {
+    background: transparent; border: 0; color: rgba(255,255,255,.65);
+    padding: 10px; font: inherit; cursor: pointer;
+}
+@media (max-width: 768px) {
+    #tab-securite .security-inline-form { padding: 14px; }
+    #tab-securite .security-session { align-items: flex-start; }
+    #tab-securite .security-session button { font-size: 12px; }
+}
