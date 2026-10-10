@@ -158,6 +158,10 @@ window.handleRegister = async function() {
 
 // ===== LOGOUT =====
 window.handleLogout = function() {
+    // Closing the dedicated settings view must also reveal the login screen.
+    document.getElementById('settings-overlay')?.classList.add('hidden');
+    document.body.classList.remove('settings-page-open');
+    if (location.hash.startsWith('#settings')) history.replaceState(null, '', location.pathname + location.search);
     clearAuth();
     _settingsCache = null;
     conversations = [];
