@@ -714,7 +714,7 @@ async function classifyParentalContent(text, settings, model, providerName, key,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model, temperature: 0, max_completion_tokens: 120,
+        model, temperature: 0, max_completion_tokens: 512,
         messages: [
           { role: 'system', content: instruction },
           { role: 'user', content: sample },
