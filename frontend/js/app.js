@@ -41,6 +41,41 @@ function authHeaders() {
     };
 }
 
+let pendingTwoFactorChallenge = null;
+function showTwoFactorLogin(challenge) {
+    pendingTwoFactorChallenge = challenge;
+    switchTab('login');
+    document.getElementById('login-two-factor')?.classList.remove('hidden');
+    document.getElementById('login-btn')?.classList.add('hidden');
+    document.getElementById('login-two-factor-code')?.focus();
+}
+window.cancelTwoFactorLogin = function() {
+    pendingTwoFactorChallenge = null;
+    document.getElementById('login-two-factor')?.classList.add('hidden');
+    document.getElementById('login-btn')?.classList.remove('hidden');
+    const input = document.getElementById('login-two-factor-code');
+    if (input) input.value = '';
+};
+window.handleTwoFactorLogin = async function() {
+    const errorEl = document.getElementById('login-error');
+    const code = document.getElementById('login-two-factor-code')?.value.trim() || '';
+    if (!pendingTwoFactorChallenge || !/^\d{6}$/.test(code)) {
+        errorEl.textContent = 'Saisis un code à six chiffres.';
+        return;
+    }
+    try {
+        const response = await fetch(API_BASE + '/auth/2fa/verify', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challenge: pendingTwoFactorChallenge, code })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Code invalide.');
+        cancelTwoFactorLogin();
+        setAuth(data.token, data.user);
+        initChatPage();
+    } catch (error) { errorEl.textContent = error.message; }
+};
+
 // ===== SWITCH TAB AUTH =====
 window.switchTab = function(tab) {
     document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
@@ -72,6 +107,10 @@ window.handleLogin = async function() {
         });
         const data = await res.json();
         if (!res.ok) { errorEl.textContent = data.error || 'Erreur de connexion.'; return; }
+        if (data.requires2FA && data.challenge) {
+            showTwoFactorLogin(data.challenge);
+            return;
+        }
         setAuth(data.token, data.user);
         initChatPage();
     } catch {
@@ -2228,7 +2267,6 @@ function readSettingsFromDOM() {
         about:         g('s-about')?.value || '',
         memory:        g('s-memory')?.checked ?? defaultSettings.memory,
         modelImprove:  g('s-model-improve')?.checked ?? defaultSettings.modelImprove,
-        twoFA:         g('s-2fa')?.checked ?? defaultSettings.twoFA,
         contentFilter:       g('s-content-filter')?.checked ?? defaultSettings.contentFilter,
         safeMode:            g('s-safe-mode')?.checked ?? defaultSettings.safeMode,
         enterSend:           g('s-enter-send')?.checked ?? defaultSettings.enterSend,
@@ -2257,7 +2295,7 @@ function populateSettingsDOM(s) {
     set('s-instructions', s.instructions); set('s-alias', s.alias);
     set('s-profession', s.profession); set('s-about', s.about);
     check('s-memory', s.memory); check('s-model-improve', s.modelImprove);
-    check('s-2fa', s.twoFA); check('s-content-filter', s.contentFilter);
+    check('s-content-filter', s.contentFilter);
     check('s-safe-mode', s.safeMode); check('s-enter-send', s.enterSend);
     check('s-web-search', s.webSearch);
     set('s-web-search-provider', s.webSearchProvider);
@@ -2496,6 +2534,7 @@ window.switchSettingsTab = function(tab) {
     if (backLabel) backLabel.textContent = isMobile() ? 'Réglages' : 'Retour';
     const content = document.querySelector('.settings-content');
     if (content) content.scrollTop = 0;
+    if (tab === 'securite') refreshAccountSecurity();
 };
 
 document.addEventListener('keydown', (event) => {
@@ -2815,9 +2854,13 @@ window.handleSocialAuth = async function(provider) {
             if (errEl) errEl.textContent = data.error || `Connexion ${label} échouée.`;
             return;
         }
-        setAuth(data.token, data.user);
-        // Déconnexion du SDK Firebase : on garde uniquement notre JWT applicatif
+        // The Firebase token is never an alternative to the second factor.
         try { await firebase.auth().signOut(); } catch {}
+        if (data.requires2FA && data.challenge) {
+            showTwoFactorLogin(data.challenge);
+            return;
+        }
+        setAuth(data.token, data.user);
         initChatPage();
     } catch (e) {
         if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
