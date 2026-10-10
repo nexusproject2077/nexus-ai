@@ -515,14 +515,25 @@ app.post('/auth/firebase', ah(async (req, res) => {
 // ---------------------------------------------------------------
 //  ACCOUNT SECURITY — real password, TOTP and revocable sessions.
 // ---------------------------------------------------------------
-function verifyAccountTotp(user, code, pending = false) {
-  if (!pending && user.twoFactorLockedUntil && Date.now() < new Date(user.twoFactorLockedUntil).getTime()) {
+async function verifyAccountTotp(user, code, pending = false) {
+  if (user.twoFactorLockedUntil && Date.now() < new Date(user.twoFactorLockedUntil).getTime()) {
     return { ok: false, status: 429, error: 'Trop de tentatives. Réessaie dans quelques minutes.' };
   }
   let secret;
   try { secret = decryptSecret(pending ? user.totpPendingSecret : user.totpSecret); }
   catch { return { ok: false, status: 400, error: 'Configuration 2FA indisponible.' }; }
   const counter = verifyTotp(secret, code, pending ? -1 : Number(user.totpLastCounter ?? -1));
+  if (counter < 0 && !pending && /^[A-F0-9]{10}$/.test(String(code || '').toUpperCase())) {
+    const hashes = user.twoFactorBackupHashes || [];
+    for (let i = 0; i < hashes.length; i++) {
+      if (await bcrypt.compare(String(code).toUpperCase(), hashes[i])) {
+        user.twoFactorBackupHashes = hashes.filter((_, index) => index !== i);
+        user.twoFactorFailures = 0;
+        user.twoFactorLockedUntil = null;
+        return { ok: true, backupUsed: true };
+      }
+    }
+  }
   if (counter < 0) {
     user.twoFactorFailures = Number(user.twoFactorFailures || 0) + 1;
     if (user.twoFactorFailures >= 5) {
@@ -545,7 +556,7 @@ app.post('/auth/2fa/verify', ah(async (req, res) => {
   } catch { return res.status(401).json({ error: 'Vérification expirée. Reconnecte-toi.' }); }
   const user = await store.usersGetById(payload.id);
   if (!user || !user.twoFactorEnabled) return res.status(401).json({ error: 'Compte ou authentification invalide.' });
-  const result = verifyAccountTotp(user, req.body?.code);
+  const result = await verifyAccountTotp(user, req.body?.code);
   await store.usersSave(user);
   if (!result.ok) return res.status(result.status).json({ error: result.error });
   res.json({ token: await issueSession(user, req), user: publicUser(user) });
@@ -592,23 +603,26 @@ app.post('/auth/2fa/enable', auth, ah(async (req, res) => {
   const user = await loadCurrentUser(req, res);
   if (!user) return;
   if (user.twoFactorEnabled || !user.totpPendingSecret) return res.status(400).json({ error: 'Commence la configuration de la double authentification.' });
-  const result = verifyAccountTotp(user, req.body?.code, true);
+  const result = await verifyAccountTotp(user, req.body?.code, true);
   if (!result.ok) { await store.usersSave(user); return res.status(result.status).json({ error: result.error }); }
   user.totpSecret = user.totpPendingSecret;
   user.totpPendingSecret = null;
   user.totpLastCounter = -1;
   user.twoFactorEnabled = true;
+  const backupCodes = Array.from({ length: 8 }, () => crypto.randomBytes(5).toString('hex').toUpperCase());
+  user.twoFactorBackupHashes = await Promise.all(backupCodes.map(code => bcrypt.hash(code, 10)));
   await store.usersSave(user);
-  res.json({ enabled: true });
+  res.json({ enabled: true, backupCodes });
 }));
 
 app.post('/auth/2fa/disable', auth, ah(async (req, res) => {
   const user = await loadCurrentUser(req, res);
   if (!user) return;
   if (!user.twoFactorEnabled) return res.status(400).json({ error: 'La double authentification est désactivée.' });
-  const result = verifyAccountTotp(user, req.body?.code);
+  const result = await verifyAccountTotp(user, req.body?.code);
   if (!result.ok) { await store.usersSave(user); return res.status(result.status).json({ error: result.error }); }
   user.twoFactorEnabled = false;
+  user.twoFactorBackupHashes = [];
   user.totpSecret = null;
   user.totpPendingSecret = null;
   user.totpLastCounter = -1;
