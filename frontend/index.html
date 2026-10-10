@@ -58,6 +58,13 @@
                     <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
                 </div>
                 <div id="login-error" class="auth-error"></div>
+                <div id="login-two-factor" class="login-two-factor hidden">
+                    <label for="login-two-factor-code">Code de vérification</label>
+                    <p>Entre le code à six chiffres de ton application d'authentification.</p>
+                    <input id="login-two-factor-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+                    <button class="auth-btn" type="button" onclick="handleTwoFactorLogin()">Vérifier et se connecter</button>
+                    <button class="security-cancel-login" type="button" onclick="cancelTwoFactorLogin()">Annuler</button>
+                </div>
                 <button class="auth-btn" id="login-btn" onclick="handleLogin()">
                     <span>Se connecter</span>
                 </button>
@@ -836,45 +843,65 @@
                 <!-- SÉCURITÉ -->
                 <div class="settings-panel" id="tab-securite">
                     <h2 class="settings-title">Sécurité</h2>
+                    <p class="security-intro">Protégez votre compte et contrôlez les appareils connectés.</p>
                     <div class="settings-divider"></div>
-
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Changer le mot de passe</span>
                             <p class="settings-desc">Mettez à jour votre mot de passe de connexion.</p>
                         </div>
-                        <button class="settings-action-btn">Modifier</button>
+                        <button class="settings-action-btn" type="button" onclick="toggleSecuritySection('security-password-form')">Modifier</button>
                     </div>
+                    <form id="security-password-form" class="security-inline-form hidden" onsubmit="changeAccountPassword(event)">
+                        <label for="security-current-password">Mot de passe actuel</label>
+                        <input id="security-current-password" type="password" autocomplete="current-password" required>
+                        <label for="security-new-password">Nouveau mot de passe (10 caractères minimum)</label>
+                        <input id="security-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+                        <label for="security-confirm-password">Confirmer le nouveau mot de passe</label>
+                        <input id="security-confirm-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+                        <button class="settings-action-btn security-primary" type="submit">Enregistrer le nouveau mot de passe</button>
+                    </form>
                     <div class="settings-divider-thin"></div>
-
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Authentification à deux facteurs</span>
-                            <p class="settings-desc">Ajoutez une couche de sécurité supplémentaire à votre compte.</p>
+                            <p class="settings-desc">Sécurisez vos connexions avec un code à six chiffres généré par une application d'authentification.</p>
+                            <p class="security-state" id="security-2fa-state">Vérification de l'état…</p>
                         </div>
-                        <label class="settings-toggle">
-                            <input type="checkbox" id="s-2fa" onchange="saveSettings()">
-                            <span class="toggle-track"></span>
-                        </label>
+                        <button class="settings-action-btn" id="security-2fa-action" type="button" onclick="toggleTwoFactorSetup()">Configurer</button>
+                    </div>
+                    <div id="security-2fa-setup" class="security-inline-form hidden">
+                        <p class="settings-desc">Ajoutez un compte dans Google Authenticator, Microsoft Authenticator ou une application TOTP compatible. Saisissez cette clé manuellement. Ne la partagez pas.</p>
+                        <div class="security-secret" id="security-totp-secret"></div>
+                        <label for="security-enable-code">Code de l'application</label>
+                        <input id="security-enable-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+                        <button class="settings-action-btn security-primary" type="button" onclick="enableTwoFactor()">Activer la double authentification</button>
+                    </div>
+                    <div id="security-2fa-disable" class="security-inline-form hidden">
+                        <label for="security-disable-code">Code actuel de votre application d'authentification</label>
+                        <input id="security-disable-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+                        <button class="settings-action-btn danger" type="button" onclick="disableTwoFactor()">Désactiver après vérification</button>
                     </div>
                     <div class="settings-divider-thin"></div>
-
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Sessions actives</span>
-                            <p class="settings-desc">Gérez les appareils connectés à votre compte.</p>
+                            <p class="settings-desc">Consultez les appareils connectés et révoquez une session.</p>
                         </div>
-                        <button class="settings-action-btn">Voir les sessions</button>
+                        <button class="settings-action-btn" type="button" onclick="toggleSecuritySessions()">Voir les sessions</button>
+                    </div>
+                    <div id="security-sessions" class="security-inline-form hidden">
+                        <div id="security-sessions-list">Chargement des sessions…</div>
                     </div>
                     <div class="settings-divider-thin"></div>
-
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Déconnexion de tous les appareils</span>
-                            <p class="settings-desc">Révoquez toutes les sessions actives.</p>
+                            <p class="settings-desc">Révoquez immédiatement toutes les sessions, y compris celle-ci.</p>
                         </div>
-                        <button class="settings-action-btn danger">Déconnecter tout</button>
+                        <button class="settings-action-btn danger" type="button" onclick="revokeAllAccountSessions()">Déconnecter tout</button>
                     </div>
+                    <p id="security-feedback" class="security-feedback" role="status" aria-live="polite"></p>
                 </div>
 
                 <!-- CONTRÔLES PARENTAUX -->
