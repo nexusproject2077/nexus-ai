@@ -318,7 +318,7 @@ async function createMongoStore(uri, dbName) {
       };
       if (user.passwordHash !== undefined) mutable.passwordHash = user.passwordHash;
       // Persist server-managed authentication state, never via /user/settings.
-      for (const field of ['sessions', 'sessionVersion', 'twoFactorEnabled', 'totpSecret', 'totpPendingSecret', 'totpLastCounter']) {
+      for (const field of ['sessions', 'sessionVersion', 'twoFactorEnabled', 'totpSecret', 'totpPendingSecret', 'totpLastCounter', 'twoFactorFailures', 'twoFactorLockedUntil']) {
         if (user[field] !== undefined) mutable[field] = user[field];
       }
 
