@@ -82,8 +82,81 @@ const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(n
 // ---------------------------------------------------------------
 //  HELPERS
 // ---------------------------------------------------------------
-function signToken(user) {
-  return jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+// Sessions are revocable in MongoDB, including tokens issued before this feature.
+async function issueSession(user, req) {
+  const sid = crypto.randomUUID();
+  const version = Number(user.sessionVersion || 0);
+  const now = new Date();
+  user.sessions = (Array.isArray(user.sessions) ? user.sessions : [])
+    .filter(s => new Date(s.expiresAt).getTime() > Date.now())
+    .slice(-19);
+  user.sessions.push({
+    id: sid, createdAt: now.toISOString(),
+    expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+    device: String(req.headers['user-agent'] || 'Appareil inconnu').slice(0, 180)
+  });
+  await store.usersSave(user);
+  return jwt.sign({ id: user.id, email: user.email, sid, sv: version }, JWT_SECRET, { expiresIn: '30d' });
+}
+
+function authResponseOrChallenge(user, req) {
+  if (user.twoFactorEnabled) {
+    return { requires2FA: true, challenge: jwt.sign(
+      { id: user.id, email: user.email, purpose: '2fa' }, JWT_SECRET, { expiresIn: '5m' }
+    ) };
+  }
+  return null;
+}
+
+const TOTP_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const secretKey = crypto.createHash('sha256').update(JWT_SECRET + ':totp:v1').digest();
+function encryptSecret(value) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', secretKey, iv);
+  const data = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return [iv, cipher.getAuthTag(), data].map(b => b.toString('base64url')).join('.');
+}
+function decryptSecret(value) {
+  const [iv, tag, data] = String(value || '').split('.').map(s => Buffer.from(s, 'base64url'));
+  const decipher = crypto.createDecipheriv('aes-256-gcm', secretKey, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+}
+function generateTotpSecret() {
+  const bytes = crypto.randomBytes(20);
+  let bits = 0, buffer = 0, result = '';
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte;
+    bits += 8;
+    while (bits >= 5) { bits -= 5; result += TOTP_ALPHABET[(buffer >>> bits) & 31]; }
+  }
+  return result;
+}
+function totpAt(secret, counter) {
+  let bits = 0, buffer = 0;
+  const bytes = [];
+  for (const char of secret.replace(/\s/g, '').toUpperCase()) {
+    buffer = (buffer << 5) | TOTP_ALPHABET.indexOf(char);
+    bits += 5;
+    if (bits >= 8) { bits -= 8; bytes.push((buffer >>> bits) & 255); }
+  }
+  const count = Buffer.alloc(8);
+  count.writeBigUInt64BE(BigInt(counter));
+  const hmac = crypto.createHmac('sha1', Buffer.from(bytes)).update(count).digest();
+  const offset = hmac[hmac.length - 1] & 15;
+  return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0');
+}
+function verifyTotp(secret, code, lastCounter = -1) {
+  if (!/^\d{6}$/.test(String(code || ''))) return -1;
+  const current = Math.floor(Date.now() / 30000);
+  for (let delta = -1; delta <= 1; delta++) {
+    const counter = current + delta;
+    if (counter <= lastCounter) continue;
+    const actual = Buffer.from(totpAt(secret, counter));
+    const provided = Buffer.from(String(code));
+    if (crypto.timingSafeEqual(actual, provided)) return counter;
+  }
+  return -1;
 }
 
 function publicUser(user) {
@@ -308,6 +381,15 @@ async function auth(req, res, next) {
       req.user = { id: payload.id, email: payload.email };
     }
 
+    // Reject revoked sessions and legacy tokens after a global revocation.
+    const account = await store.usersGetById(req.user.id);
+    if (!account || payload.purpose || Number(payload.sv || 0) !== Number(account.sessionVersion || 0)) {
+      return res.status(401).json({ error: 'Session révoquée ou expirée.' });
+    }
+    if (payload.sid && !(account.sessions || []).some(s => s.id === payload.sid && new Date(s.expiresAt).getTime() > Date.now())) {
+      return res.status(401).json({ error: 'Session révoquée.' });
+    }
+    req.sessionId = payload.sid || null;
     next();
   } catch {
     return res.status(401).json({ error: 'Session expirée.' });
@@ -359,7 +441,7 @@ app.post('/auth/register', ah(async (req, res) => {
     createdAt: new Date().toISOString(),
   };
   await store.usersCreate(user);
-  res.json({ token: signToken(user), user: publicUser(user) });
+  res.json({ token: await issueSession(user, req), user: publicUser(user) });
 }));
 
 app.post('/auth/login', ah(async (req, res) => {
@@ -370,14 +452,19 @@ app.post('/auth/login', ah(async (req, res) => {
   // Unknown email here → maybe an old MongoDB account: migrate on the fly.
   if (!user) {
     user = await migrateFromLegacy(email, password);
-    if (user) return res.json({ token: signToken(user), user: publicUser(user) });
+    if (user) {
+      const challenge = authResponseOrChallenge(user, req);
+      return res.json(challenge || { token: await issueSession(user, req), user: publicUser(user) });
+    }
     return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
   }
 
   if (!user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
   }
-  res.json({ token: signToken(user), user: publicUser(user) });
+  const challenge = authResponseOrChallenge(user, req);
+  if (challenge) return res.json(challenge);
+  res.json({ token: await issueSession(user, req), user: publicUser(user) });
 }));
 
 // Social sign-in (Firebase Authentication): the frontend performs the
@@ -417,7 +504,8 @@ app.post('/auth/firebase', ah(async (req, res) => {
       };
       await store.usersCreate(user);
     }
-    res.json({ token: signToken(user), user: publicUser(user) });
+    const challenge = authResponseOrChallenge(user, req);
+    res.json(challenge || { token: await issueSession(user, req), user: publicUser(user) });
   } catch (e) {
     console.error('verifyIdToken failed:', e.message);
     res.status(401).json({ error: 'Jeton Firebase invalide.' });
