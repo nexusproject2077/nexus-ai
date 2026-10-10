@@ -21,6 +21,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { searchWeb } from './web-search.js';
+import { durationExample } from './duration-example.js';
 import { getStore, randomUUID } from './store.js';
 import { getFirebaseAdmin } from './firebase-admin.js';
 
@@ -1211,6 +1212,18 @@ app.post('/web/search', auth, ah(async (req, res) => {
     const results = await searchWeb({ provider, key: searchKeyFor(user, provider), query: req.body?.query, maxResults: req.body?.maxResults ?? user.settings?.webSearchMaxResults });
     res.set('Cache-Control', 'no-store').json({ provider, results });
   } catch (error) { res.status(error.status || 502).json({ error: error.message }); }
+}));
+
+app.post('/user/duration-example', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  const minutes = req.body?.minutes;
+  if (![60, 75].includes(minutes)) return res.status(400).json({ error: 'Durée non prise en charge.' });
+  const sentAt = req.body?.sentAt ? new Date(req.body.sentAt) : new Date();
+  if (!Number.isFinite(sentAt.getTime()) || Math.abs(Date.now() - sentAt.getTime()) > 5 * 60000) {
+    return res.status(400).json({ error: 'Heure d’envoi invalide. Vérifiez l’horloge de votre appareil et réessayez.' });
+  }
+  res.set('Cache-Control', 'no-store').json(durationExample({ minutes, sentAt, phone: user.phone }));
 }));
 
 app.get('/user/export', auth, ah(async (req, res) => {

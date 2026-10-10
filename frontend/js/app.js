@@ -1636,19 +1636,6 @@ function hideTypingIndicator() {
     setFooterGenerating(false);
 }
 
-// ===== TICKET =====
-function formatDate(d) { return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()).slice(-2)}`; }
-function formatTime(d) { return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
-function generateRandomSequence() { return Array.from({length:6}, () => String(Math.floor(Math.random()*100)).padStart(2,'0')).join("'"); }
-function generateRandomLetter() { return String.fromCharCode(65 + Math.floor(Math.random()*26)); }
-function generateRandomCode() {
-    const l1 = generateRandomLetter();
-    let l2, l3;
-    do { l2 = generateRandomLetter(); } while (l2 === l1);
-    do { l3 = generateRandomLetter(); } while (l3 === l1 || l3 === l2);
-    return `${l1}${Math.floor(Math.random()*10)}${l2}${l3}`;
-}
-
 // ===== SYSTEM PROMPT BUILDER =====
 function buildSystemPrompt() {
     const s = loadSettings();
@@ -1886,6 +1873,7 @@ async function getGroqAIResponse(message, searchContext = null) {
 // ===== GESTION MESSAGES =====
 async function handleMessage() {
     const message = userInput.value.trim();
+    const sentAt = new Date().toISOString();
     if (!message && attachedFiles.length === 0) return;
     if (isTyping) return;
 
@@ -1910,20 +1898,20 @@ async function handleMessage() {
     userInput.value = '';
     userInput.style.height = 'auto';
 
-    if (message === '1h' && attachedFiles.length === 0) {
-        const now = new Date();
-        const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
-        // Numéro de l'utilisateur connecté (chiffres uniquement), sinon numéro par défaut
-        const ticketPhone = ((getUser() || {}).phone || '').replace(/\D/g, '') || '0783643942';
-        const ticket = `Titre 1 voyage\n\nA présenter au conducteur à la montée\nLe ${formatDate(now)}\nDe ${formatTime(now)} a ${formatTime(oneHourLater)}\n\n1.35 E\n\n${generateRandomSequence()}\n\n${ticketPhone}${generateRandomCode()}\n\nCGV : www.tcat.fr/cgv-ticket-sms`;
-        setTimeout(async () => {
-            await addMessage('bot-message', ticket, false, true);
+    if (/^1\s*h\s*(15)?$/i.test(message) && attachedFiles.length === 0) {
+        try {
+            const example = await securityRequest('/user/duration-example', {
+                method: 'POST', body: JSON.stringify({ minutes: /15$/.test(message) ? 75 : 60, sentAt })
+            });
+            await addMessage('bot-message', example.text, false, false);
+        } catch (error) {
+            showToast('Exemple indisponible : ' + error.message, 'error', 5000);
+        } finally {
             sendButton.disabled = false;
-            userInput.disabled  = false;
+            userInput.disabled = false;
             userInput.focus();
             toggleStopButton(false);
-        }, 500);
-        navigator.clipboard.writeText(ticket).catch(console.error);
+        }
     } else {
         toggleStopButton(true);
 
