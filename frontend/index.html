@@ -61,7 +61,7 @@
                 <div id="login-two-factor" class="login-two-factor hidden">
                     <label for="login-two-factor-code">Code de vérification</label>
                     <p>Entre le code à six chiffres de ton application d'authentification.</p>
-                    <input id="login-two-factor-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+                    <input id="login-two-factor-code" type="text" autocomplete="one-time-code" maxlength="10" placeholder="Code ou code de secours">
                     <button class="auth-btn" type="button" onclick="handleTwoFactorLogin()">Vérifier et se connecter</button>
                     <button class="security-cancel-login" type="button" onclick="cancelTwoFactorLogin()">Annuler</button>
                 </div>
@@ -877,9 +877,16 @@
                         <input id="security-enable-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
                         <button class="settings-action-btn security-primary" type="button" onclick="enableTwoFactor()">Activer la double authentification</button>
                     </div>
+                    <div id="security-recovery-codes" class="security-inline-form hidden">
+                        <strong>Codes de récupération à conserver</strong>
+                        <p class="settings-desc">Ces huit codes ne seront affichés qu'une fois. Copiez-les et gardez-les dans un endroit sûr. Chaque code est utilisable une seule fois si vous perdez l'accès à votre application.</p>
+                        <pre id="security-recovery-list" class="security-secret"></pre>
+                        <button class="settings-action-btn" type="button" onclick="copyRecoveryCodes()">Copier les codes</button>
+                        <button class="settings-action-btn security-primary" type="button" onclick="acknowledgeRecoveryCodes()">J'ai sauvegardé mes codes</button>
+                    </div>
                     <div id="security-2fa-disable" class="security-inline-form hidden">
                         <label for="security-disable-code">Code actuel de votre application d'authentification</label>
-                        <input id="security-disable-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+                        <input id="security-disable-code" type="text" autocomplete="one-time-code" maxlength="10" placeholder="Code à 6 chiffres ou code de secours">
                         <button class="settings-action-btn danger" type="button" onclick="disableTwoFactor()">Désactiver après vérification</button>
                     </div>
                     <div class="settings-divider-thin"></div>
