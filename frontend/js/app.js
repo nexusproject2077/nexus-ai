@@ -1624,7 +1624,8 @@ function buildSystemPrompt() {
     if (s.lists === 'less') prompt += ' Evite les listes et les titres, prefere la prose.';
     if (s.emojis === 'more') prompt += ' Utilise des emojis pour illustrer tes reponses.';
     if (s.emojis === 'less') prompt += " N'utilise pas d'emojis.";
-    if (s.contentFilter || s.safeMode) prompt += ' Filtre tout contenu inapproprie.';
+    if (s.contentFilter || s.safeMode) prompt += ' Filtre les contenus explicites, violents ou dangereux pour les mineurs, tout en autorisant les explications educatives et preventives adaptees.';
+    if (s.safeMode) prompt += ' Mode strict : reponds uniquement aux demandes educatives ou pedagogiques. Refuse poliment les demandes sans objectif d apprentissage.';
     if (s.instructions) prompt += '\n\nInstructions personnalisees : ' + s.instructions;
     if (s.webSearch) prompt += '\n\nDes résultats de recherche web peuvent être fournis avant ta question. Utilise-les pour donner des réponses précises et à jour. Cite toujours les sources avec leur URL.';
     prompt += "\n\nIMPORTANT: Tu PEUX analyser tous les fichiers. Tu peux utiliser le formatage Markdown.";
@@ -1735,6 +1736,13 @@ function showWebSources(sources) {
 // ===== API GROQ =====
 async function getGroqAIResponse(message, searchContext = null) {
     try {
+        // The backend reads the saved account settings. Wait for the latest
+        // parental-control toggle to be persisted before sending the prompt.
+        await settingsSaveQueue;
+        const safety = loadSettings();
+        if (settingsSaveError && (safety.contentFilter || safety.safeMode)) {
+            return 'Impossible de confirmer les contrôles parentaux sur le serveur. Vérifie ta connexion et réessaie.';
+        }
         const conv = getCurrentConversation();
         if (!conv.history) conv.history = [];
 
@@ -2006,17 +2014,26 @@ async function loadSettingsFromServer() {
     }
 }
 
-async function saveSettingsToServer(s) {
-    try {
-        _settingsCache = s;
-        await fetch(`${API_BASE}/user/settings`, {
-            method: 'PUT',
-            headers: authHeaders(),
-            body: JSON.stringify({ settings: s })
-        });
-    } catch (err) {
-        console.error('Erreur sauvegarde settings:', err);
-    }
+// Serialize settings writes so rapid toggles cannot arrive out of order.
+let settingsSaveQueue = Promise.resolve();
+let settingsSaveError = null;
+function saveSettingsToServer(s) {
+    _settingsCache = s;
+    settingsSaveQueue = settingsSaveQueue.then(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/user/settings`, {
+                method: 'PUT',
+                headers: authHeaders(),
+                body: JSON.stringify({ settings: s })
+            });
+            if (!response.ok) throw new Error('Enregistrement impossible (' + response.status + ')');
+            settingsSaveError = null;
+        } catch (err) {
+            settingsSaveError = err;
+            console.error('Erreur sauvegarde settings:', err);
+        }
+    });
+    return settingsSaveQueue;
 }
 
 async function saveSidebarStateToServer(state) {
