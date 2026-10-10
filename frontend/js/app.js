@@ -59,8 +59,8 @@ window.cancelTwoFactorLogin = function() {
 window.handleTwoFactorLogin = async function() {
     const errorEl = document.getElementById('login-error');
     const code = document.getElementById('login-two-factor-code')?.value.trim() || '';
-    if (!pendingTwoFactorChallenge || !/^\d{6}$/.test(code)) {
-        errorEl.textContent = 'Saisis un code à six chiffres.';
+    if (!pendingTwoFactorChallenge || !/^(\d{6}|[A-Fa-f0-9]{10})$/.test(code)) {
+        errorEl.textContent = 'Saisis un code à six chiffres ou un code de récupération.';
         return;
     }
     try {
@@ -2631,18 +2631,36 @@ window.enableTwoFactor = async function() {
     const code = document.getElementById('security-enable-code')?.value.trim() || '';
     if (!/^\d{6}$/.test(code)) return securityFeedback('Saisissez un code à six chiffres.', true);
     try {
-        await securityRequest('/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) });
+        const result = await securityRequest('/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) });
+        const recovery = document.getElementById('security-recovery-codes');
+        const recoveryList = document.getElementById('security-recovery-list');
+        if (recoveryList) recoveryList.textContent = (result.backupCodes || []).join('\n');
+        recovery?.classList.remove('hidden');
         document.getElementById('security-2fa-setup')?.classList.add('hidden');
         const secret = document.getElementById('security-totp-secret');
         if (secret) secret.textContent = '';
         document.getElementById('security-enable-code').value = '';
         await refreshAccountSecurity();
-        securityFeedback('Double authentification activée. Conservez l’accès à votre application d’authentification.');
+        securityFeedback('Double authentification activée. Enregistrez vos codes de récupération avant de quitter cette page.');
     } catch (error) { securityFeedback(error.message, true); }
+};
+window.copyRecoveryCodes = function() {
+    const codes = document.getElementById('security-recovery-list')?.textContent || '';
+    if (!codes) return;
+    navigator.clipboard?.writeText(codes).then(
+        () => securityFeedback('Codes copiés. Conservez-les dans un endroit sûr.'),
+        () => securityFeedback('Sélectionnez et copiez les codes manuellement.', true)
+    );
+};
+window.acknowledgeRecoveryCodes = function() {
+    const list = document.getElementById('security-recovery-list');
+    if (list) list.textContent = '';
+    document.getElementById('security-recovery-codes')?.classList.add('hidden');
+    securityFeedback('Codes de récupération confirmés.');
 };
 window.disableTwoFactor = async function() {
     const code = document.getElementById('security-disable-code')?.value.trim() || '';
-    if (!/^\d{6}$/.test(code)) return securityFeedback('Saisissez le code actuel.', true);
+    if (!/^(\d{6}|[A-Fa-f0-9]{10})$/.test(code)) return securityFeedback('Saisissez un code à six chiffres ou un code de récupération.', true);
     try {
         await securityRequest('/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ code }) });
         document.getElementById('security-2fa-disable')?.classList.add('hidden');
