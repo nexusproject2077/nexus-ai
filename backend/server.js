@@ -513,6 +513,138 @@ app.post('/auth/firebase', ah(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------
+//  ACCOUNT SECURITY — real password, TOTP and revocable sessions.
+// ---------------------------------------------------------------
+function verifyAccountTotp(user, code, pending = false) {
+  if (!pending && user.twoFactorLockedUntil && Date.now() < new Date(user.twoFactorLockedUntil).getTime()) {
+    return { ok: false, status: 429, error: 'Trop de tentatives. Réessaie dans quelques minutes.' };
+  }
+  let secret;
+  try { secret = decryptSecret(pending ? user.totpPendingSecret : user.totpSecret); }
+  catch { return { ok: false, status: 400, error: 'Configuration 2FA indisponible.' }; }
+  const counter = verifyTotp(secret, code, pending ? -1 : Number(user.totpLastCounter ?? -1));
+  if (counter < 0) {
+    user.twoFactorFailures = Number(user.twoFactorFailures || 0) + 1;
+    if (user.twoFactorFailures >= 5) {
+      user.twoFactorLockedUntil = new Date(Date.now() + 5 * 60000).toISOString();
+      user.twoFactorFailures = 0;
+    }
+    return { ok: false, status: 400, error: 'Code de vérification invalide.' };
+  }
+  user.twoFactorFailures = 0;
+  user.twoFactorLockedUntil = null;
+  if (!pending) user.totpLastCounter = counter;
+  return { ok: true };
+}
+
+app.post('/auth/2fa/verify', ah(async (req, res) => {
+  let payload;
+  try {
+    payload = jwt.verify(String(req.body?.challenge || ''), JWT_SECRET);
+    if (payload.purpose !== '2fa') throw new Error('wrong purpose');
+  } catch { return res.status(401).json({ error: 'Vérification expirée. Reconnecte-toi.' }); }
+  const user = await store.usersGetById(payload.id);
+  if (!user || !user.twoFactorEnabled) return res.status(401).json({ error: 'Compte ou authentification invalide.' });
+  const result = verifyAccountTotp(user, req.body?.code);
+  await store.usersSave(user);
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  res.json({ token: await issueSession(user, req), user: publicUser(user) });
+}));
+
+app.get('/auth/security', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  res.json({ hasPassword: !!user.passwordHash, twoFactorEnabled: !!user.twoFactorEnabled });
+}));
+
+app.post('/auth/password', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  const { currentPassword, newPassword } = req.body || {};
+  if (!user.passwordHash) return res.status(409).json({ error: 'Ce compte utilise une connexion externe. Gère son mot de passe chez ton fournisseur.' });
+  if (typeof currentPassword !== 'string' || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    return res.status(401).json({ error: 'Mot de passe actuel incorrect.' });
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 10 || newPassword.length > 128) {
+    return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir entre 10 et 128 caractères.' });
+  }
+  if (await bcrypt.compare(newPassword, user.passwordHash)) return res.status(400).json({ error: 'Choisis un nouveau mot de passe différent.' });
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  user.sessionVersion = Number(user.sessionVersion || 0) + 1;
+  user.sessions = [];
+  await store.usersSave(user);
+  res.json({ token: await issueSession(user, req), message: 'Mot de passe modifié. Les autres sessions sont révoquées.' });
+}));
+
+app.post('/auth/2fa/setup', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  if (user.twoFactorEnabled) return res.status(409).json({ error: 'La double authentification est déjà active.' });
+  const secret = generateTotpSecret();
+  user.totpPendingSecret = encryptSecret(secret);
+  await store.usersSave(user);
+  const uri = 'otpauth://totp/' + encodeURIComponent('Nexus AI:' + user.email) +
+    '?secret=' + secret + '&issuer=' + encodeURIComponent('Nexus AI') + '&algorithm=SHA1&digits=6&period=30';
+  res.json({ secret, uri });
+}));
+
+app.post('/auth/2fa/enable', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  if (user.twoFactorEnabled || !user.totpPendingSecret) return res.status(400).json({ error: 'Commence la configuration de la double authentification.' });
+  const result = verifyAccountTotp(user, req.body?.code, true);
+  if (!result.ok) { await store.usersSave(user); return res.status(result.status).json({ error: result.error }); }
+  user.totpSecret = user.totpPendingSecret;
+  user.totpPendingSecret = null;
+  user.totpLastCounter = -1;
+  user.twoFactorEnabled = true;
+  await store.usersSave(user);
+  res.json({ enabled: true });
+}));
+
+app.post('/auth/2fa/disable', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  if (!user.twoFactorEnabled) return res.status(400).json({ error: 'La double authentification est désactivée.' });
+  const result = verifyAccountTotp(user, req.body?.code);
+  if (!result.ok) { await store.usersSave(user); return res.status(result.status).json({ error: result.error }); }
+  user.twoFactorEnabled = false;
+  user.totpSecret = null;
+  user.totpPendingSecret = null;
+  user.totpLastCounter = -1;
+  await store.usersSave(user);
+  res.json({ enabled: false });
+}));
+
+app.get('/auth/sessions', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  const sessions = (user.sessions || [])
+    .filter(s => new Date(s.expiresAt).getTime() > Date.now())
+    .map(s => ({ id: s.id, device: s.device, createdAt: s.createdAt, expiresAt: s.expiresAt, current: s.id === req.sessionId }));
+  res.json({ sessions, legacySession: !req.sessionId });
+}));
+
+app.delete('/auth/sessions/:id', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  const before = (user.sessions || []).length;
+  user.sessions = (user.sessions || []).filter(s => s.id !== req.params.id);
+  if (before === user.sessions.length) return res.status(404).json({ error: 'Session introuvable.' });
+  await store.usersSave(user);
+  res.json({ ok: true, currentRevoked: req.params.id === req.sessionId });
+}));
+
+app.post('/auth/sessions/revoke-all', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  user.sessionVersion = Number(user.sessionVersion || 0) + 1;
+  user.sessions = [];
+  await store.usersSave(user);
+  res.json({ ok: true });
+}));
+
+// ---------------------------------------------------------------
 //  GITHUB — OAuth and repository actions. The OAuth access token is
 //  kept only in a signed HttpOnly cookie on this API domain;
 //  it is never returned to JavaScript or stored in conversation data.
