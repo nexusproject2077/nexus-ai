@@ -701,7 +701,7 @@
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Activer la recherche web</span>
-                            <p class="settings-desc">L'IA cherchera sur le web avant de répondre aux questions.</p>
+                            <p class="settings-desc">Recherche selon le mode choisi, avec une clé API valide.</p>
                         </div>
                         <label class="settings-toggle">
                             <input type="checkbox" id="s-web-search" onchange="saveSettings()">
@@ -713,7 +713,7 @@
                     <div class="settings-row">
                         <span class="settings-label">Mode de recherche</span>
                         <select class="settings-select" id="s-web-search-mode" onchange="saveSettings()">
-                            <option value="auto">Automatique (détection intelligente)</option>
+                            <option value="auto">Automatique</option>
                             <option value="always">Toujours rechercher</option>
                             <option value="never">Jamais (désactivé)</option>
                         </select>
@@ -723,16 +723,16 @@
                     <div class="settings-row">
                         <span class="settings-label">Fournisseur</span>
                         <select class="settings-select" id="s-web-search-provider" onchange="saveSettings()">
-                            <option value="tavily">Tavily (recommandé · 1000/mois gratuit)</option>
-                            <option value="brave">Brave Search (2000/mois gratuit)</option>
+                            <option value="tavily">Tavily</option>
+                            <option value="brave">Brave Search</option>
                         </select>
                     </div>
                     <div class="settings-divider-thin"></div>
 
                     <div class="settings-row-col">
                         <span class="settings-label">Clé API</span>
-                        <p class="settings-desc">Tavily : obtenez une clé sur <strong>app.tavily.com</strong> &nbsp;·&nbsp; Brave : <strong>api.search.brave.com</strong></p>
-                        <input type="password" class="settings-input" id="s-web-search-key" placeholder="Colle ta clé API ici…" oninput="saveSettings()" autocomplete="off">
+                        <p class="settings-desc">Clé propre au fournisseur choisi. <a href="https://app.tavily.com" target="_blank" rel="noopener noreferrer">Compte Tavily</a> · <a href="https://api-dashboard.search.brave.com" target="_blank" rel="noopener noreferrer">Compte Brave</a>. Une clé enregistrée reste masquée ; laissez le champ vide pour la conserver.</p>
+                        <input type="password" class="settings-input" id="s-web-search-key" placeholder="Colle ta clé API ici…" onchange="saveSettings()" autocomplete="off">
                     </div>
                     <div class="settings-divider-thin"></div>
 
@@ -745,6 +745,12 @@
                             <option value="10">10 sources</option>
                         </select>
                     </div>
+                    <div class="web-search-actions">
+                        <button class="settings-action-btn" type="button" onclick="testWebSearch(this)">Tester la recherche</button>
+                        <button class="settings-action-btn" type="button" onclick="removeWebSearchKey(this)">Supprimer la clé</button>
+                    </div>
+                    <p id="web-search-status" class="security-feedback" role="status" aria-live="polite"></p>
+                    <ul id="web-search-test-results"></ul>
                 </div>
 
                 <!-- FACTURATION -->

@@ -3,7 +3,6 @@ const NEXUS_CFG = window.NEXUS_CONFIG || {};
 const API_BASE = NEXUS_CFG.API_BASE || 'https://api.mmi25b11.mmi-troyes.fr';
 const MODELS = NEXUS_CFG.MODELS || [{ id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 · 70B', hint: '' }];
 const TYPING_SPEED = 15;
-const TAVILY_KEY = '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';
 
 // ===== ÉTAT MODÈLE (sélecteur Groq) =====
 let currentModel = localStorage.getItem('nexus_model') || NEXUS_CFG.DEFAULT_MODEL || MODELS[0].id;
@@ -1687,42 +1686,58 @@ function buildSystemPrompt() {
 // ===== RECHERCHE WEB =====
 async function webSearch(query) {
     const s = loadSettings();
-    const provider = s.webSearchProvider || 'tavily';
-    const key = s.webSearchKey || (provider === 'tavily' ? TAVILY_KEY : '');
-    const maxResults = parseInt(s.webSearchMaxResults) || 5;
-
-    if (!key) throw new Error('Clé API manquante — configurez-la dans Réglages › Applications');
-
-    if (provider === 'tavily') {
-        const res = await fetch('https://api.tavily.com/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: key, query, max_results: maxResults, search_depth: 'basic', include_answer: false })
-        });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || `Tavily erreur ${res.status}`);
-        }
-        const data = await res.json();
-        return (data.results || []).map(r => ({ title: r.title, url: r.url, snippet: r.content }));
-    }
-
-    if (provider === 'brave') {
-        const res = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${maxResults}`, {
-            headers: { 'Accept': 'application/json', 'X-Subscription-Token': key }
-        });
-        if (!res.ok) throw new Error(`Brave erreur ${res.status}`);
-        const data = await res.json();
-        return (data.web?.results || []).map(r => ({ title: r.title, url: r.url, snippet: r.description }));
-    }
-
-    throw new Error('Fournisseur inconnu');
+    await settingsSaveQueue;
+    if (settingsSaveError) throw new Error('Les réglages ne sont pas enregistrés. Réessayez.');
+    const data = await securityRequest('/web/search', { method: 'POST', body: JSON.stringify({
+        query, provider: s.webSearchProvider || 'tavily', maxResults: s.webSearchMaxResults || 5
+    }) });
+    return data.results || [];
 }
+
+function updateWebSearchStatus(message, error = false) {
+    const el = document.getElementById('web-search-status');
+    if (!el) return;
+    const s = loadSettings();
+    const configured = !!s.webSearchConfigured?.[s.webSearchProvider || 'tavily'];
+    el.textContent = message || (settingsSaveError ? 'Échec de l’enregistrement. Réessayez.'
+        : !s.webSearch || s.webSearchMode === 'never' ? 'Recherche désactivée pour les prochaines réponses.'
+        : configured ? 'Clé configurée. Testez la recherche pour vérifier la connexion.' : 'Ajoutez une clé API pour le fournisseur sélectionné.');
+    el.classList.toggle('error', error || !!settingsSaveError);
+}
+window.testWebSearch = async function(button) {
+    if (button.disabled) return;
+    button.disabled = true;
+    const list = document.getElementById('web-search-test-results');
+    list.replaceChildren();
+    updateWebSearchStatus('Test de connexion en cours…');
+    try {
+        await saveSettings();
+        const results = await webSearch('Nexus AI recherche web');
+        for (const source of results) {
+            const link = document.createElement('a');
+            link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+            link.textContent = source.title || new URL(source.url).hostname;
+            const item = document.createElement('li'); item.appendChild(link); list.appendChild(item);
+        }
+        updateWebSearchStatus(results.length ? 'Connexion réussie : ' + results.length + ' source(s) reçue(s).' : 'Connexion réussie, aucun résultat pour cette recherche.');
+    } catch (error) { updateWebSearchStatus(error.message, true); }
+    finally { button.disabled = false; }
+};
+window.removeWebSearchKey = async function(button) {
+    if (!confirm('Supprimer la clé enregistrée pour ce fournisseur ?')) return;
+    button.disabled = true;
+    try {
+        const s = readSettingsFromDOM();
+        s.webSearchKey = ''; s.webSearchClearKey = true;
+        document.getElementById('s-web-search-key').value = '';
+        await saveSettingsToServer(s);
+        updateWebSearchStatus();
+    } finally { button.disabled = false; }
+};
 
 function shouldSearchWeb(message) {
     const s = loadSettings();
-    const key = s.webSearchKey || TAVILY_KEY;
-    if (!s.webSearch || !key) return false;
+    if (!s.webSearch) return false;
     if (s.webSearchMode === 'always') return true;
     if (s.webSearchMode === 'never') return false;
     const lower = message.toLowerCase();
@@ -2070,6 +2085,12 @@ function saveSettingsToServer(s) {
                 body: JSON.stringify({ settings: s })
             });
             if (!response.ok) throw new Error('Enregistrement impossible (' + response.status + ')');
+            const saved = await response.json();
+            if (saved.settings) {
+                _settingsCache = { ..._settingsCache, webSearchKey: '', webSearchConfigured: saved.settings.webSearchConfigured };
+                const input = document.getElementById('s-web-search-key');
+                if (input && input.value === s.webSearchKey) input.value = '';
+            }
             settingsSaveError = null;
         } catch (err) {
             settingsSaveError = err;
@@ -2238,7 +2259,7 @@ function saveSettings() {
     const status = document.getElementById('parental-settings-status');
     if (status) status.textContent = 'Enregistrement des préférences…';
     const pending = saveSettingsToServer(s);
-    pending.then(updateParentalSettingsStatus);
+    pending.then(() => { updateParentalSettingsStatus(); updateWebSearchStatus(); });
     return pending;
 }
 
@@ -2303,9 +2324,10 @@ function populateSettingsDOM(s) {
     check('s-safe-mode', s.safeMode); check('s-enter-send', s.enterSend);
     check('s-web-search', s.webSearch);
     set('s-web-search-provider', s.webSearchProvider);
-    set('s-web-search-key', s.webSearchKey);
+    set('s-web-search-key', '');
     set('s-web-search-max', s.webSearchMaxResults);
     set('s-web-search-mode', s.webSearchMode);
+    updateWebSearchStatus();
     updateSliderLabel();
     updateColorDot();
 }

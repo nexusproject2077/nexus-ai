@@ -7010,3 +7010,37 @@ body.settings-page-open { overflow: hidden !important; }
     #tab-securite .security-session { align-items: flex-start; }
     #tab-securite .security-session button { font-size: 12px; }
 }
+
+/* Keep form controls inside the settings page at narrow viewport widths. */
+#settings-modal .settings-row > div { min-width: 0; }
+#settings-modal .settings-desc { overflow-wrap: anywhere; }
+#settings-modal .settings-select { min-width: 0; max-width: 100%; }
+#settings-modal .settings-input { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.web-search-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+#web-search-test-results { padding-left: 20px; overflow-wrap: anywhere; }
+#web-search-test-results li { margin: 12px 0; }
+@media (max-width: 768px) {
+    #settings-modal .settings-row:has(> .settings-select),
+    #settings-modal .settings-row:has(> .settings-action-btn) {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    #settings-modal .settings-row > .settings-select,
+    #settings-modal .settings-row > .settings-action-btn,
+    #settings-modal .settings-row-col > .settings-input {
+        width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+        min-height: 46px; font-size: 16px;
+    }
+    #settings-modal .settings-label { flex-shrink: 1; }
+    #settings-modal .settings-toggle { flex: 0 0 auto; }
+    #settings-modal .settings-row > div { flex: 1 1 auto; }
+    #settings-modal .settings-action-btn { white-space: normal; overflow-wrap: anywhere; }
+    #settings-modal .security-session { flex-direction: column; align-items: stretch; }
+    .web-search-actions { flex-direction: column; }
+    .web-search-actions .settings-action-btn { min-height: 46px; font-size: 16px; width: 100%; }
+}
+#tab-applications .security-feedback { margin: 16px 0; font-size: 14px; line-height: 1.5; color: #8dc9a3; }
+#tab-applications .security-feedback.error { color: #ff8585; }
+#tab-applications .settings-action-btn:disabled { opacity: .5; cursor: wait; }
+#tab-applications a { color: #66baff; }

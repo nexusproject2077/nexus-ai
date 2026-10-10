@@ -20,6 +20,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import { searchWeb } from './web-search.js';
 import { getStore, randomUUID } from './store.js';
 import { getFirebaseAdmin } from './firebase-admin.js';
 
@@ -1191,6 +1192,27 @@ app.post('/trusted-contact/accept', express.urlencoded({ extended: false, limit:
 //  USER SETTINGS + PHONE + MEMORY
 // ---------------------------------------------------------------
 // Explicit allowlist: exports never include password hashes, tokens or TOTP secrets.
+function searchKeyFor(user, provider) {
+  if (user.webSearchSecrets?.[provider]) {
+    try { return decryptSecret(user.webSearchSecrets[provider]); } catch { return ''; }
+  }
+  if (user.settings?.webSearchProvider === provider && user.settings?.webSearchKey) return user.settings.webSearchKey;
+  return provider === 'tavily' ? process.env.TAVILY_API_KEY || '' : process.env.BRAVE_SEARCH_API_KEY || '';
+}
+function publicAccountSettings(user) {
+  const settings = Object.fromEntries(Object.entries(user.settings || {}).filter(([key]) => !['trustedContact', 'webSearchKey', 'webSearchClearKey', 'webSearchConfigured'].includes(key)));
+  return { ...settings, modelImprove: false, webSearchKey: '', webSearchConfigured: { tavily: !!searchKeyFor(user, 'tavily'), brave: !!searchKeyFor(user, 'brave') } };
+}
+app.post('/web/search', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  const provider = req.body?.provider || user.settings?.webSearchProvider || 'tavily';
+  try {
+    const results = await searchWeb({ provider, key: searchKeyFor(user, provider), query: req.body?.query, maxResults: req.body?.maxResults ?? user.settings?.webSearchMaxResults });
+    res.set('Cache-Control', 'no-store').json({ provider, results });
+  } catch (error) { res.status(error.status || 502).json({ error: error.message }); }
+}));
+
 app.get('/user/export', auth, ah(async (req, res) => {
   const user = await loadCurrentUser(req, res);
   if (!user) return;
@@ -1199,7 +1221,7 @@ app.get('/user/export', auth, ah(async (req, res) => {
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
     user: { ...publicUser(user), provider: user.provider, createdAt: user.createdAt },
-    settings: { ...Object.fromEntries(Object.entries(user.settings || {}).filter(([key]) => key !== 'trustedContact')), modelImprove: false },
+    settings: publicAccountSettings(user),
     trustedContact: trustedContactPublic(user.settings?.trustedContact),
     memory: user.memory || [],
     sidebarState: user.sidebarState || 'visible',
@@ -1220,7 +1242,7 @@ app.get('/user/settings', auth, ah(async (req, res) => {
   res.json({
     user: publicUser(user),
     // Consent tokens are server-managed; never expose their hash in the general settings payload.
-    settings: { ...Object.fromEntries(Object.entries(user.settings || {}).filter(([key]) => key !== 'trustedContact')), modelImprove: false },
+    settings: publicAccountSettings(user),
     memory: user.memory || [],
     sidebarState: user.sidebarState || 'visible',
     conversations,
@@ -1234,13 +1256,28 @@ app.put('/user/settings', auth, ah(async (req, res) => {
   if (settings !== undefined) {
     const safe = settings && typeof settings === 'object' && !Array.isArray(settings) ? { ...settings } : {};
     delete safe.trustedContact;
+    const provider = safe.webSearchProvider || user.settings?.webSearchProvider || 'tavily';
+    if (!['tavily', 'brave'].includes(provider)) return res.status(400).json({ error: 'Fournisseur de recherche invalide.' });
+    const keys = { ...(user.webSearchSecrets || {}) };
+    // Migrate an older plaintext account key without returning it to the browser.
+    const legacyProvider = user.settings?.webSearchProvider || 'tavily';
+    if (user.settings?.webSearchKey && !keys[legacyProvider]) keys[legacyProvider] = encryptSecret(user.settings.webSearchKey);
+    if (safe.webSearchClearKey === true) delete keys[provider];
+    else if (typeof safe.webSearchKey === 'string' && safe.webSearchKey.trim()) {
+      if (safe.webSearchKey.length > 512) return res.status(400).json({ error: 'Clé API trop longue.' });
+      keys[provider] = encryptSecret(safe.webSearchKey.trim());
+    }
+    user.webSearchSecrets = keys;
+    delete safe.webSearchKey;
+    delete safe.webSearchClearKey;
+    delete safe.webSearchConfigured;
     // No model-training pipeline is configured. Never claim an opt-in is active.
     safe.modelImprove = false;
     user.settings = { ...safe, ...(user.settings?.trustedContact ? { trustedContact: user.settings.trustedContact } : {}) };
   }
   if (sidebarState !== undefined) user.sidebarState = sidebarState;
   await store.usersSave(user);
-  res.json({ ok: true });
+  res.json({ ok: true, settings: publicAccountSettings(user) });
 }));
 
 // Update the user's phone number (from the login prompt or Settings).
