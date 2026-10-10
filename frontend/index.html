@@ -885,7 +885,7 @@
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Filtre de contenu</span>
-                            <p class="settings-desc">Bloquer les contenus inappropriés pour les mineurs.</p>
+                            <p class="settings-desc">Bloquer les demandes explicites, violentes ou dangereuses, tout en conservant les explications éducatives adaptées.</p>
                         </div>
                         <label class="settings-toggle">
                             <input type="checkbox" id="s-content-filter" onchange="saveSettings()">
@@ -897,13 +897,14 @@
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Mode sécurisé strict</span>
-                            <p class="settings-desc">Limitez les sujets abordables aux thèmes éducatifs uniquement.</p>
+                            <p class="settings-desc">Autoriser uniquement les demandes éducatives. Active également le filtre de contenu.</p>
                         </div>
                         <label class="settings-toggle">
                             <input type="checkbox" id="s-safe-mode" onchange="saveSettings()">
                             <span class="toggle-track"></span>
                         </label>
                     </div>
+                    <p id="parental-settings-status" class="settings-desc" role="status" aria-live="polite">Les contrôles s’appliquent aux prochaines réponses de Nexus AI.</p>
                 </div>
 
                 <!-- CONTACT DE CONFIANCE -->
