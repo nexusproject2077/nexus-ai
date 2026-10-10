@@ -814,6 +814,12 @@ app.get('/conversations', auth, ah(async (req, res) => {
   res.json(await store.convsListByUser(req.user.id));
 }));
 
+// Delete only this account's persisted conversations; do not report success on failure.
+app.delete('/conversations', auth, ah(async (req, res) => {
+  const deletedCount = await store.convsDeleteByUser(req.user.id);
+  res.json({ ok: true, deletedCount });
+}));
+
 app.post('/conversations', auth, ah(async (req, res) => {
   const { assistantMode, codeTask } = req.body || {};
   const conv = {
@@ -1184,6 +1190,24 @@ app.post('/trusted-contact/accept', express.urlencoded({ extended: false, limit:
 // ---------------------------------------------------------------
 //  USER SETTINGS + PHONE + MEMORY
 // ---------------------------------------------------------------
+// Explicit allowlist: exports never include password hashes, tokens or TOTP secrets.
+app.get('/user/export', auth, ah(async (req, res) => {
+  const user = await loadCurrentUser(req, res);
+  if (!user) return;
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    user: { ...publicUser(user), provider: user.provider, createdAt: user.createdAt },
+    settings: { ...Object.fromEntries(Object.entries(user.settings || {}).filter(([key]) => key !== 'trustedContact')), modelImprove: false },
+    trustedContact: trustedContactPublic(user.settings?.trustedContact),
+    memory: user.memory || [],
+    sidebarState: user.sidebarState || 'visible',
+    security: { twoFactorEnabled: !!user.twoFactorEnabled, sessions: (user.sessions || []).map(({device, createdAt, expiresAt}) => ({device, createdAt, expiresAt})) },
+    conversations: await store.convsListByUser(user.id),
+  });
+}));
+
 app.get('/user/settings', auth, ah(async (req, res) => {
   const user = await loadCurrentUser(req, res);
   if (!user) return;
@@ -1196,7 +1220,7 @@ app.get('/user/settings', auth, ah(async (req, res) => {
   res.json({
     user: publicUser(user),
     // Consent tokens are server-managed; never expose their hash in the general settings payload.
-    settings: Object.fromEntries(Object.entries(user.settings || {}).filter(([key]) => key !== 'trustedContact')),
+    settings: { ...Object.fromEntries(Object.entries(user.settings || {}).filter(([key]) => key !== 'trustedContact')), modelImprove: false },
     memory: user.memory || [],
     sidebarState: user.sidebarState || 'visible',
     conversations,
@@ -1210,6 +1234,8 @@ app.put('/user/settings', auth, ah(async (req, res) => {
   if (settings !== undefined) {
     const safe = settings && typeof settings === 'object' && !Array.isArray(settings) ? { ...settings } : {};
     delete safe.trustedContact;
+    // No model-training pipeline is configured. Never claim an opt-in is active.
+    safe.modelImprove = false;
     user.settings = { ...safe, ...(user.settings?.trustedContact ? { trustedContact: user.settings.trustedContact } : {}) };
   }
   if (sidebarState !== undefined) user.sidebarState = sidebarState;

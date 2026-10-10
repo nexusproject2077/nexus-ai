@@ -52,6 +52,13 @@ function createMemoryStore() {
       Object.assign(c, fields);
       return c;
     },
+    async convsDeleteByUser(userId) {
+      let count = 0;
+      for (const [id, conv] of conversations) {
+        if (conv.userId === userId) { conversations.delete(id); count++; }
+      }
+      return count;
+    },
     async convsDelete(id) { conversations.delete(id); },
   };
 }
@@ -103,6 +110,15 @@ function createFirestoreStore(db) {
       if (!doc.exists) return null;
       await ref.set(stripUndefined(fields), { merge: true });
       return { ...doc.data(), ...fields };
+    },
+    async convsDeleteByUser(userId) {
+      const snapshot = await convsCol.where('userId', '==', userId).get();
+      for (let start = 0; start < snapshot.docs.length; start += 400) {
+        const batch = db.batch();
+        snapshot.docs.slice(start, start + 400).forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      }
+      return snapshot.size;
     },
     async convsDelete(id) { await convsCol.doc(id).delete(); },
   };
@@ -361,6 +377,13 @@ async function createMongoStore(uri, dbName) {
         { returnDocument: 'after' }
       );
       return cleanConv(result);
+    },
+
+    async convsDeleteByUser(userId) {
+      const userIds = [userId];
+      if (ObjectId.isValid(userId)) userIds.push(new ObjectId(userId));
+      const result = await convsCol.deleteMany({ userId: { $in: userIds } });
+      return result.deletedCount;
     },
 
     async convsDelete(id) {

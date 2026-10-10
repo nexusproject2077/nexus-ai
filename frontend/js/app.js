@@ -1985,7 +1985,7 @@ const defaultSettings = {
     notifProjects: 'email', notifReco: 'both', notifReplies: 'push', notifTasks: 'both',
     notifUsage: 'both', style: 'default', warm: 'default', enthusiastic: 'default',
     lists: 'default', emojis: 'default', quickReplies: true, instructions: '',
-    alias: '', profession: '', about: '', memory: false, modelImprove: true,
+    alias: '', profession: '', about: '', memory: false, modelImprove: false,
     twoFA: false, contentFilter: false, safeMode: false, enterSend: true,
     webSearch: true, webSearchProvider: 'tavily', webSearchKey: '', webSearchMaxResults: 5, webSearchMode: 'auto',
 };
@@ -2270,7 +2270,7 @@ function readSettingsFromDOM() {
         profession:    g('s-profession')?.value || '',
         about:         g('s-about')?.value || '',
         memory:        g('s-memory')?.checked ?? defaultSettings.memory,
-        modelImprove:  g('s-model-improve')?.checked ?? defaultSettings.modelImprove,
+        modelImprove:  false,
         contentFilter:       g('s-content-filter')?.checked ?? defaultSettings.contentFilter,
         safeMode:            g('s-safe-mode')?.checked ?? defaultSettings.safeMode,
         enterSend:           g('s-enter-send')?.checked ?? defaultSettings.enterSend,
@@ -2298,7 +2298,7 @@ function populateSettingsDOM(s) {
     check('s-quick-replies', s.quickReplies);
     set('s-instructions', s.instructions); set('s-alias', s.alias);
     set('s-profession', s.profession); set('s-about', s.about);
-    check('s-memory', s.memory); check('s-model-improve', s.modelImprove);
+    check('s-memory', s.memory); check('s-model-improve', false);
     check('s-content-filter', s.contentFilter);
     check('s-safe-mode', s.safeMode); check('s-enter-send', s.enterSend);
     check('s-web-search', s.webSearch);
@@ -2754,35 +2754,49 @@ function updateStorageInfo() {
     } catch {}
 }
 
-window.exportData = function() {
+window.exportData = async function(button) {
+    if (button?.disabled) return;
+    if (button) button.disabled = true;
     try {
-        const data = {
-            user: getUser(),
-            settings: _settingsCache || loadSettings(),
-            exportedAt: new Date().toISOString(),
-        };
+        await settingsSaveQueue;
+        if (settingsSaveError) throw new Error('Les derniers réglages ne sont pas enregistrés. Réessayez avant d’exporter.');
+        const data = await securityRequest('/user/export');
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a    = document.createElement('a');
-        a.href     = URL.createObjectURL(blob);
-        a.download = 'nexus-data.json';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'nexus-data-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(a.href);
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        showToast('Export téléchargé : compte, conversations, mémoire et réglages.', 'success');
     } catch (err) {
-        alert("Erreur lors de l'export.");
-    }
+        showToast('Export impossible : ' + err.message, 'error', 5000);
+    } finally { if (button) button.disabled = false; }
 };
 
-window.confirmDeleteAllConversations = function() {
-    if (!confirm('Supprimer TOUTES vos conversations ? Cette action est irreversible.')) return;
-    conversations = [];
-    chatBox.innerHTML = '';
-    fetch(`${API_BASE}/conversations`, { headers: authHeaders() })
-        .then(r => r.json())
-        .then(list => Promise.all(list.map(c =>
-            fetch(`${API_BASE}/conversations/${c._id}`, { method: 'DELETE', headers: authHeaders() })
-        )))
-        .catch(() => {})
-        .finally(() => createNewConversation());
+window.confirmDeleteAllConversations = async function(button) {
+    if (button?.disabled) return;
+    if (isTyping) return showToast('Attendez la fin de la réponse avant de supprimer les conversations.', 'error');
+    if (!confirm('Supprimer TOUTES vos conversations sur tous vos appareils ? Cette action est irréversible.')) return;
+    if (button) button.disabled = true;
+    stopConversationSync();
+    try {
+        const result = await securityRequest('/conversations', { method: 'DELETE' });
+        conversations = [];
+        currentConversationId = null;
+        chatBox.innerHTML = '';
+        lastSyncFingerprint = '';
+        createNewConversation();
+        showToast(result.deletedCount + ' conversation(s) supprimée(s) du serveur.', 'success');
+    } catch (err) {
+        showToast('Suppression non confirmée : ' + err.message, 'error', 5000);
+        if (getToken()) await loadConversationsFromServer();
+    } finally {
+        if (button) button.disabled = false;
+        if (getToken()) startConversationSync();
+    }
 };
 
 window.clearCache = function() {

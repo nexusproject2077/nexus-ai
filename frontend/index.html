@@ -787,10 +787,10 @@
                     <div class="settings-row">
                         <div>
                             <span class="settings-label">Amélioration du modèle</span>
-                            <p class="settings-desc">Autoriser Nexus AI à utiliser vos conversations pour améliorer ses modèles.</p>
+                            <p class="settings-desc">Indisponible : Nexus AI ne dispose pas de système d’entraînement utilisant vos conversations.</p>
                         </div>
                         <label class="settings-toggle">
-                            <input type="checkbox" id="s-model-improve" checked onchange="saveSettings()">
+                            <input type="checkbox" id="s-model-improve" disabled aria-label="Amélioration du modèle indisponible">
                             <span class="toggle-track"></span>
                         </label>
                     </div>
@@ -801,7 +801,7 @@
                             <span class="settings-label">Exporter mes données</span>
                             <p class="settings-desc">Téléchargez toutes vos conversations et données.</p>
                         </div>
-                        <button class="settings-action-btn" onclick="exportData()">Exporter</button>
+                        <button class="settings-action-btn" onclick="exportData(this)">Exporter</button>
                     </div>
                     <div class="settings-divider-thin"></div>
 
@@ -810,7 +810,7 @@
                             <span class="settings-label">Supprimer toutes les conversations</span>
                             <p class="settings-desc">Cette action est irréversible.</p>
                         </div>
-                        <button class="settings-action-btn danger" onclick="confirmDeleteAllConversations()">Supprimer</button>
+                        <button class="settings-action-btn danger" onclick="confirmDeleteAllConversations(this)">Supprimer</button>
                     </div>
                 </div>
 
