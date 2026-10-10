@@ -2577,11 +2577,17 @@ async function refreshAccountSecurity() {
         const btn = document.getElementById('security-2fa-action');
         if (btn) btn.textContent = accountSecurity.twoFactorEnabled ? 'Désactiver' : 'Configurer';
         const passwordForm = document.getElementById('security-password-form');
-        if (!accountSecurity.hasPassword && passwordForm) {
-            passwordForm.classList.add('hidden');
-            const changeBtn = document.querySelector('#tab-securite .settings-row .settings-action-btn');
-            if (changeBtn) { changeBtn.disabled = true; changeBtn.title = 'Mot de passe géré par votre fournisseur de connexion'; }
+        const passwordRow = document.querySelector('#tab-securite .settings-row');
+        const changeBtn = passwordRow?.querySelector('.settings-action-btn');
+        const description = passwordRow?.querySelector('.settings-desc');
+        if (changeBtn) {
+            changeBtn.disabled = !accountSecurity.hasPassword;
+            changeBtn.title = accountSecurity.hasPassword ? '' : 'Mot de passe géré par votre fournisseur de connexion';
         }
+        if (description) description.textContent = accountSecurity.hasPassword
+            ? 'Mettez à jour votre mot de passe de connexion.'
+            : 'Ce compte utilise une connexion externe. Modifiez votre mot de passe auprès de Google ou GitHub.';
+        if (!accountSecurity.hasPassword) passwordForm?.classList.add('hidden');
     } catch (error) {
         if (state) state.textContent = 'État indisponible.';
         securityFeedback(error.message, true);
