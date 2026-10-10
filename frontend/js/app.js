@@ -2537,6 +2537,180 @@ window.switchSettingsTab = function(tab) {
     if (tab === 'securite') refreshAccountSecurity();
 };
 
+
+/* Security settings are server-backed. Never represent a saved preference
+   as real 2FA or revoke sessions only in the browser. */
+let accountSecurity = { hasPassword: true, twoFactorEnabled: false };
+function securityFeedback(message, error = false) {
+    const el = document.getElementById('security-feedback');
+    if (!el) return;
+    el.textContent = message || '';
+    el.classList.toggle('error', !!error);
+}
+async function securityRequest(path, options = {}) {
+    const response = await fetch(API_BASE + path, {
+        ...options, headers: { ...authHeaders(), ...(options.headers || {}) },
+        cache: 'no-store'
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        if (response.status === 401 && /session|révoquée|expirée/i.test(data.error || '')) {
+            window.handleLogout();
+        }
+        throw new Error(data.error || 'La demande a échoué.');
+    }
+    return data;
+}
+async function refreshAccountSecurity() {
+    const state = document.getElementById('security-2fa-state');
+    if (state) state.textContent = 'Chargement…';
+    securityFeedback('');
+    try {
+        accountSecurity = await securityRequest('/auth/security');
+        if (state) state.textContent = accountSecurity.twoFactorEnabled
+            ? 'Activée. Un code est exigé à chaque nouvelle connexion.'
+            : 'Désactivée. Activez une application d’authentification pour sécuriser vos connexions.';
+        const btn = document.getElementById('security-2fa-action');
+        if (btn) btn.textContent = accountSecurity.twoFactorEnabled ? 'Désactiver' : 'Configurer';
+        const passwordForm = document.getElementById('security-password-form');
+        if (!accountSecurity.hasPassword && passwordForm) {
+            passwordForm.classList.add('hidden');
+            const changeBtn = document.querySelector('#tab-securite .settings-row .settings-action-btn');
+            if (changeBtn) { changeBtn.disabled = true; changeBtn.title = 'Mot de passe géré par votre fournisseur de connexion'; }
+        }
+    } catch (error) {
+        if (state) state.textContent = 'État indisponible.';
+        securityFeedback(error.message, true);
+    }
+}
+window.toggleSecuritySection = function(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (section) section.classList.toggle('hidden');
+    securityFeedback('');
+};
+window.changeAccountPassword = async function(event) {
+    event.preventDefault();
+    const current = document.getElementById('security-current-password');
+    const next = document.getElementById('security-new-password');
+    const confirm = document.getElementById('security-confirm-password');
+    if (next.value !== confirm.value) return securityFeedback('Les nouveaux mots de passe ne correspondent pas.', true);
+    if (next.value.length < 10) return securityFeedback('Utilisez au moins 10 caractères.', true);
+    try {
+        const result = await securityRequest('/auth/password', {
+            method: 'POST', body: JSON.stringify({ currentPassword: current.value, newPassword: next.value })
+        });
+        localStorage.setItem('nexus_token', result.token);
+        current.value = ''; next.value = ''; confirm.value = '';
+        document.getElementById('security-password-form')?.classList.add('hidden');
+        securityFeedback(result.message || 'Mot de passe modifié.');
+    } catch (error) { securityFeedback(error.message, true); }
+};
+window.toggleTwoFactorSetup = async function() {
+    securityFeedback('');
+    const setup = document.getElementById('security-2fa-setup');
+    const disable = document.getElementById('security-2fa-disable');
+    if (accountSecurity.twoFactorEnabled) {
+        setup?.classList.add('hidden');
+        disable?.classList.toggle('hidden');
+        return;
+    }
+    if (!setup?.classList.contains('hidden')) { setup.classList.add('hidden'); return; }
+    try {
+        const data = await securityRequest('/auth/2fa/setup', { method: 'POST', body: '{}' });
+        const secret = document.getElementById('security-totp-secret');
+        if (secret) secret.textContent = data.secret;
+        disable?.classList.add('hidden');
+        setup.classList.remove('hidden');
+    } catch (error) { securityFeedback(error.message, true); }
+};
+window.enableTwoFactor = async function() {
+    const code = document.getElementById('security-enable-code')?.value.trim() || '';
+    if (!/^\d{6}$/.test(code)) return securityFeedback('Saisissez un code à six chiffres.', true);
+    try {
+        await securityRequest('/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) });
+        document.getElementById('security-2fa-setup')?.classList.add('hidden');
+        const secret = document.getElementById('security-totp-secret');
+        if (secret) secret.textContent = '';
+        document.getElementById('security-enable-code').value = '';
+        await refreshAccountSecurity();
+        securityFeedback('Double authentification activée. Conservez l’accès à votre application d’authentification.');
+    } catch (error) { securityFeedback(error.message, true); }
+};
+window.disableTwoFactor = async function() {
+    const code = document.getElementById('security-disable-code')?.value.trim() || '';
+    if (!/^\d{6}$/.test(code)) return securityFeedback('Saisissez le code actuel.', true);
+    try {
+        await securityRequest('/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ code }) });
+        document.getElementById('security-2fa-disable')?.classList.add('hidden');
+        document.getElementById('security-disable-code').value = '';
+        await refreshAccountSecurity();
+        securityFeedback('Double authentification désactivée.');
+    } catch (error) { securityFeedback(error.message, true); }
+};
+window.toggleSecuritySessions = async function() {
+    const section = document.getElementById('security-sessions');
+    if (!section) return;
+    if (!section.classList.contains('hidden')) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+    await refreshSecuritySessions();
+};
+async function refreshSecuritySessions() {
+    const list = document.getElementById('security-sessions-list');
+    if (!list) return;
+    list.textContent = 'Chargement des sessions…';
+    try {
+        const data = await securityRequest('/auth/sessions');
+        list.replaceChildren();
+        if (data.legacySession) {
+            const legacy = document.createElement('p');
+            legacy.className = 'settings-desc';
+            legacy.textContent = 'Votre session actuelle a été créée avant le suivi des appareils. Reconnectez-vous pour la voir ici.';
+            list.appendChild(legacy);
+        }
+        if (!data.sessions?.length) {
+            const empty = document.createElement('p');
+            empty.className = 'settings-desc';
+            empty.textContent = 'Aucune session récente enregistrée.';
+            list.appendChild(empty);
+        }
+        for (const session of data.sessions || []) {
+            const row = document.createElement('div');
+            row.className = 'security-session';
+            const details = document.createElement('div');
+            const title = document.createElement('strong');
+            title.textContent = session.current ? 'Cet appareil' : 'Appareil connecté';
+            const desc = document.createElement('p');
+            desc.textContent = session.device || 'Navigateur inconnu';
+            const time = document.createElement('small');
+            time.textContent = 'Connexion : ' + new Date(session.createdAt).toLocaleString('fr-FR');
+            details.append(title, desc, time);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'settings-action-btn';
+            button.textContent = 'Révoquer';
+            button.addEventListener('click', () => revokeAccountSession(session.id, session.current));
+            row.append(details, button);
+            list.appendChild(row);
+        }
+    } catch (error) { list.textContent = error.message; }
+}
+async function revokeAccountSession(sessionId, isCurrent) {
+    if (!confirm(isCurrent ? 'Déconnecter cet appareil ?' : 'Révoquer cette session ?')) return;
+    try {
+        await securityRequest('/auth/sessions/' + encodeURIComponent(sessionId), { method: 'DELETE' });
+        if (isCurrent) return window.handleLogout();
+        await refreshSecuritySessions();
+        securityFeedback('Session révoquée.');
+    } catch (error) { securityFeedback(error.message, true); }
+}
+window.revokeAllAccountSessions = async function() {
+    if (!confirm('Déconnecter tous les appareils, y compris celui-ci ? Il faudra se reconnecter.')) return;
+    try {
+        await securityRequest('/auth/sessions/revoke-all', { method: 'POST', body: '{}' });
+        window.handleLogout();
+    } catch (error) { securityFeedback(error.message, true); }
+};
+
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !id('settings-overlay')?.classList.contains('hidden')) settingsBack();
 });
