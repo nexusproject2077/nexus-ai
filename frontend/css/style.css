@@ -6875,3 +6875,65 @@ body.settings-page-open { overflow: hidden !important; }
     #tab-contact .trusted-contact-actions .settings-action-btn { width: 100%; }
     #tab-contact .trusted-contact-form .settings-action-btn { max-width: 100%; }
 }
+
+
+/* Responsive Markdown tables: never crush a column into vertical letters.
+   The table scrolls horizontally inside its own bubble on narrow phones. */
+.bot-message .md-table-wrap {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+}
+.bot-message .md-table {
+    width: max-content !important;
+    min-width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+}
+.bot-message .md-table th,
+.bot-message .md-table td {
+    min-width: 135px !important;
+    max-width: 340px !important;
+    box-sizing: border-box !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
+}
+.bot-message .md-table th:first-child,
+.bot-message .md-table td:first-child {
+    min-width: 150px !important;
+}
+.bot-message .md-table a {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+}
+
+@media (max-width: 768px) {
+    /* Clear the fixed composer and signature when scrolling to the last reply. */
+    #chat-box:not(:has(.empty-state)) {
+        box-sizing: border-box !important;
+        padding-bottom: calc(190px + env(safe-area-inset-bottom, 0px)) !important;
+        scroll-padding-bottom: calc(190px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    .bot-message .md-table {
+        min-width: 600px !important;
+        font-size: 13px !important;
+    }
+    .bot-message .md-table th,
+    .bot-message .md-table td {
+        min-width: 145px !important;
+        max-width: 300px !important;
+        padding: 10px 12px !important;
+    }
+    .bot-message .md-table th:first-child,
+    .bot-message .md-table td:first-child {
+        min-width: 155px !important;
+    }
+}
