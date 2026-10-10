@@ -2174,10 +2174,29 @@ window.clearAllMemory = async function() {
     showToast('Memoire effacee.', 'success');
 };
 
+function updateParentalSettingsStatus() {
+    const el = document.getElementById('parental-settings-status');
+    if (!el) return;
+    if (settingsSaveError) {
+        el.textContent = 'Échec de l’enregistrement. Vérifie ta connexion et réessaie.';
+        return;
+    }
+    const s = loadSettings();
+    el.textContent = s.safeMode
+        ? 'Mode éducatif strict et filtre de contenu actifs pour les prochaines réponses.'
+        : s.contentFilter
+            ? 'Filtre de contenu actif pour les prochaines réponses.'
+            : 'Contrôles désactivés. Les prochaines réponses ne seront pas soumises à ces restrictions supplémentaires.';
+}
+
 function saveSettings() {
     const s = readSettingsFromDOM();
     _settingsCache = s;
-    saveSettingsToServer(s);
+    const status = document.getElementById('parental-settings-status');
+    if (status) status.textContent = 'Enregistrement des préférences…';
+    const pending = saveSettingsToServer(s);
+    pending.then(updateParentalSettingsStatus);
+    return pending;
 }
 
 function readSettingsFromDOM() {
