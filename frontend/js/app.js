@@ -1946,6 +1946,20 @@ async function handleMessage() {
             toggleStopButton(false);
         }, 500);
         navigator.clipboard.writeText(ticket).catch(console.error);
+    } else { if (message === '1h15' && attachedFiles.length === 0) {
+        // Easter egg Grand Reims Mobilités — valable 1h15 (75 min), 1.80€
+        const now = new Date();
+        const endLater = new Date(now.getTime() + 75 * 60 * 1000);
+        const ticketPhone = ((getUser() || {}).phone || '').replace(/\D/g, '') || '0760438076';
+        const ticket = `GRAND REIMS MOBILITES\nTitre 1 voyage\nValable 1h15 de ${formatTime(now)} à ${formatTime(endLater)}\nle ${formatDate(now)}\n1.80€ TTC\n\n\n${generateRandomSequence()}\n\n\n${ticketPhone}${generateReimsCode()}\n\n\nwww.grandreims-mobilites.fr`;
+        setTimeout(async () => {
+            await addMessage('bot-message', ticket, false, true);
+            sendButton.disabled = false;
+            userInput.disabled  = false;
+            userInput.focus();
+            toggleStopButton(false);
+        }, 500);
+        navigator.clipboard.writeText(ticket).catch(console.error);
     } else {
         toggleStopButton(true);
 
