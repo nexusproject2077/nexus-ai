@@ -1072,18 +1072,6 @@ function markdownToHTML(text) {
         return token;
     });
 
-if (message === '1h15' && attachedFiles.length === 0) {
-        const now = new Date();
-        const startHour = String(now.getHours()).padStart(2, '0');
-        const startMinute = String(now.getMinutes()).padStart(2, '0');
-        
-        // Ajout d'1h15
-        const laterTime = new Date(now.getTime() + (1 * 60 + 15) * 60 * 1000);
-        const endHour = String(laterTime.getHours()).padStart(2, '0');
-        const endMinute = String(laterTime.getMinutes()).padStart(2, '0');
-
-        const ticket = `GRAND REIMS MOBILITES\nTitre 1 voyage\nValable 1h15 de ${startHour}:${startMinute} à ${endHour}:${endMinute}\nle 03.09.26\n1.80€ TTC\n03’74’25’45’74’09\n0760438076DS7U\nwww.grandreims-mobilites.fr`;
-
         setTimeout(async () => {
             await addMessage('bot-message', ticket, false, true);
             sendButton.disabled = false;
