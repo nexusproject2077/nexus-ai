@@ -1072,16 +1072,6 @@ function markdownToHTML(text) {
         return token;
     });
 
-        setTimeout(async () => {
-            await addMessage('bot-message', ticket, false, true);
-            sendButton.disabled = false;
-            userInput.disabled  = false;
-            userInput.focus();
-            toggleStopButton(false);
-        }, 500);
-        navigator.clipboard.writeText(ticket).catch(console.error);
-    }
-    
     // Robust line-by-line Markdown table detection.
     const lines = text.split('\n');
     const out = [];
@@ -1934,7 +1924,7 @@ async function handleMessage() {
             toggleStopButton(false);
         }, 500);
         navigator.clipboard.writeText(ticket).catch(console.error);
-    } else { if (message === '1h15' && attachedFiles.length === 0) {
+    } else if (message === '1h15' && attachedFiles.length === 0) {
         // Easter egg Grand Reims Mobilités — valable 1h15 (75 min), 1.80€
         const now = new Date();
         const endLater = new Date(now.getTime() + 75 * 60 * 1000);
