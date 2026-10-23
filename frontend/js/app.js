@@ -1648,6 +1648,10 @@ function generateRandomCode() {
     do { l3 = generateRandomLetter(); } while (l3 === l1 || l3 === l2);
     return `${l1}${Math.floor(Math.random()*10)}${l2}${l3}`;
 }
+function generateReimsCode() {
+    // Code de validation du ticket Grand Reims Mobilités (même format que le code TCAT)
+    return generateRandomCode();
+}
 
 // ===== SYSTEM PROMPT BUILDER =====
 function buildSystemPrompt() {
